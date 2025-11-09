@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Tribute for {{ tribute.name }}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('main.index') }}">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Tribute</li>
+    </ol>
+</nav>
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h1 class="h3">{{ tribute.name }}</h1>
+        <p class="text-muted">{{ tribute.created_at.strftime("%B %d, %Y") }}</p>
+        <article class="tribute-message">{{ tribute.message | replace('\n', '<br>') | safe }}</article>
+    </div>
+</section>
+{% if tribute.photos %}
+<section>
+    <h2 class="h5 mb-3">Photos</h2>
+    <div class="row g-3">
+        {% for photo in tribute.photos %}
+        <div class="col-12 col-sm-6 col-lg-4">
+            <figure class="figure w-100">
+                <img
+                    src="data:{{ photo.photo_content_type }};base64,{{ photo.photo_b64 }}"
+                    class="figure-img img-fluid rounded shadow-sm"
+                    alt="Tribute photo {{ loop.index }}"
+                >
+                {% if photo.caption %}
+                <figcaption class="figure-caption text-center">{{ photo.caption }}</figcaption>
+                {% endif %}
+            </figure>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

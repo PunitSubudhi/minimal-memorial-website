@@ -14,3 +14,9 @@ wheels/
 
 .vscode/
 .github/
+
+.DS_Store
+*.DS_Store
+.pem
+*.log
+*.pem

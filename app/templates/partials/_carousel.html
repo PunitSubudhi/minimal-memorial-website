@@ -1,0 +1,40 @@
+{% if carousel_images %}
+<div id="memorialCarousel" class="carousel slide" data-bs-ride="carousel">
+    <div class="carousel-indicators">
+        {% for image in carousel_images %}
+            <button
+                type="button"
+                data-bs-target="#memorialCarousel"
+                data-bs-slide-to="{{ loop.index0 }}"
+                {% if loop.first %}class="active" aria-current="true"{% endif %}
+                aria-label="Slide {{ loop.index }}"
+            ></button>
+        {% endfor %}
+    </div>
+    <div class="carousel-inner rounded shadow-sm overflow-hidden">
+        {% for image in carousel_images %}
+            <div class="carousel-item {% if loop.first %}active{% endif %}">
+                <img
+                    src="{{ image.src }}"
+                    class="d-block w-100 carousel-photo"
+                    alt="{{ image.alt or ('Tribute photo ' ~ loop.index) }}"
+                    loading="lazy"
+                >
+            </div>
+        {% endfor %}
+    </div>
+    <button class="carousel-control-prev" type="button" data-bs-target="#memorialCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Previous</span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#memorialCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Next</span>
+    </button>
+</div>
+{% else %}
+<div class="placeholder-hero text-center py-5 bg-light rounded shadow-sm">
+    <h2 class="fw-semibold">Cherished memories coming soon</h2>
+    <p class="mb-0 text-muted">Upload tribute photos to populate the carousel.</p>
+</div>
+{% endif %}

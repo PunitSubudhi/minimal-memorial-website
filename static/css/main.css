@@ -1,0 +1,34 @@
+body {
+    font-family: "Open Sans", sans-serif;
+    background-color: #f7f7f9;
+    color: #333;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Playfair Display", serif;
+}
+
+.alerts-stack {
+    max-width: 720px;
+    margin: 0 auto 1rem;
+}
+
+.carousel-photo {
+    width: 100%;
+    height: 420px;
+    object-fit: contain;
+    background-color: #111;
+}
+
+.placeholder-hero {
+    background: linear-gradient(135deg, rgba(125, 138, 181, 0.2), rgba(255, 255, 255, 0.6));
+}
+
+.tribute-message {
+    white-space: pre-line;
+    font-size: 1.05rem;
+}
+
+footer {
+    font-family: "Open Sans", sans-serif;
+}

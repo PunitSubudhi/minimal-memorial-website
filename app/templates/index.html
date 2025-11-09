@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Remembering Together{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        {% include "partials/_carousel.html" %}
+    </div>
+</div>
+<div class="row mb-5">
+    <div class="col-12">
+        {% include "partials/_form.html" %}
+    </div>
+</div>
+<div class="row g-4">
+    <div class="col-12">
+        {% include "partials/_tribute_list.html" %}
+    </div>
+</div>
+{% endblock %}

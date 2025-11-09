@@ -1,0 +1,33 @@
+<section class="card shadow-sm">
+    <div class="card-body">
+        <h2 class="h4 mb-3">Share a Tribute</h2>
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {{ form.hidden_tag() }}
+            <div class="mb-3">
+                {{ form.name.label(class_="form-label") }}
+                {{ form.name(class_="form-control", maxlength=120) }}
+                {% for error in form.name.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ form.message.label(class_="form-label") }}
+                {{ form.message(class_="form-control", maxlength=2000) }}
+                {% for error in form.message.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ form.photos.label(class_="form-label") }}
+                {{ form.photos(class_="form-control", multiple=true) }}
+                <div class="form-text">Accepted formats: {{ ', '.join(config.get('ALLOWED_EXTENSIONS', ())) }}</div>
+                {% for error in form.photos.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+            <div class="d-grid">
+                {{ form.submit(class_="btn btn-primary btn-lg") }}
+            </div>
+        </form>
+    </div>
+</section>
