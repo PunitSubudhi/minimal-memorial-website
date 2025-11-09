@@ -19,7 +19,7 @@ This project powers a memorial site where visitors can share tributes, upload ph
 - `app/__init__.py`: Flask application factory and blueprint registration.
 - `app/routes.py`: Homepage and tribute detail routes.
 - `app/services/`: Upload normalization, notification delivery, and tribute persistence helpers.
-- `app/templates/`: Bootstrap-powered layouts and components.
-- `static/`: CSS overrides, JavaScript hooks, and carousel imagery (`static/images/`).
+- `app/templates/`: Bootstrap-powered layouts with embedded CSS and components.
+- `static/`: JavaScript hooks and carousel imagery (`static/images/`).
 
 Carousel photos populate automatically from the `static/images/` directory. Uploaded tribute photos are converted to WebP before storing in the database to optimize size and display performance.
