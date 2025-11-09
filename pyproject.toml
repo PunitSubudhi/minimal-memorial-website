@@ -1,0 +1,17 @@
+[project]
+name = "memorial"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+	"Flask",
+	"Flask-WTF",
+	"Flask-SQLAlchemy",
+	"Flask-Migrate",
+	"psycopg[binary]",
+	"python-dotenv",
+	"Pillow",
+	"pillow-heif",
+	"requests",
+]
