@@ -7,13 +7,6 @@
         <li class="breadcrumb-item active" aria-current="page">Tribute</li>
     </ol>
 </nav>
-<section class="card shadow-sm mb-4">
-    <div class="card-body">
-        <h1 class="h3">{{ tribute.name }}</h1>
-        <p class="text-muted">{{ tribute.created_at.strftime("%B %d, %Y") }}</p>
-        <article class="tribute-message">{{ tribute.message | replace('\n', '<br>') | safe }}</article>
-    </div>
-</section>
 {% if tribute.photos %}
 <section>
     <h2 class="h5 mb-3">Photos</h2>
@@ -35,4 +28,11 @@
     </div>
 </section>
 {% endif %}
+<section class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h1 class="h3">{{ tribute.name }}</h1>
+        <p class="text-muted">{{ tribute.created_at.strftime("%B %d, %Y") }}</p>
+        <article class="tribute-message">{{ tribute.message | replace('\n', '<br>') | safe }}</article>
+    </div>
+</section>
 {% endblock %}

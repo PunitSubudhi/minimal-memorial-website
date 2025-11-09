@@ -22,6 +22,7 @@ def index() -> str:
         entries = storage.prepare_photo_entries(
             form.photos.data or [],
             logger=current_app.logger,
+            max_bytes=current_app.config.get("MAX_PHOTO_UPLOAD_BYTES"),
         )
         try:
             tribute = tributes.create_tribute(

@@ -18,6 +18,7 @@ else:  # pragma: no cover
 
 LOGGER = logging.getLogger(__name__)
 _WEBP_MIME = "image/webp"
+_DEFAULT_MAX_BYTES = 1 * 1024 * 1024
 
 
 def prepare_photo_entries(
@@ -25,10 +26,13 @@ def prepare_photo_entries(
     *,
     logger: Optional[logging.Logger] = None,
     quality: int = 85,
+    max_bytes: int | None = None,
+    min_quality: int = 30,
 ) -> List[dict[str, str | int]]:
-    """Convert uploads to base64-encoded WebP payloads."""
+    """Convert uploads to base64-encoded WebP payloads with optional size caps."""
     prepared: List[dict[str, str | int]] = []
     log = logger or LOGGER
+    size_cap = _resolve_max_bytes(max_bytes)
 
     for index, storage in enumerate(files or []):
         if not isinstance(storage, FileStorage):
@@ -47,14 +51,30 @@ def prepare_photo_entries(
             continue
 
         with image_handle as image:
-            payload = _image_to_webp(image, quality=quality)
-            if not payload:
+            payload_bytes, smallest = _encode_with_limit(
+                image,
+                quality=quality,
+                min_quality=min_quality,
+                max_bytes=size_cap,
+            )
+
+        if payload_bytes is None:
+            if smallest is None:
                 log.warning("Skipping file %s: image conversion failed", filename)
-                continue
+            else:
+                smallest_mb = len(smallest) / (1024 * 1024)
+                target_mb = (size_cap or 0) / (1024 * 1024)
+                log.warning(
+                    "Skipping file %s: minimum achievable size %.2f MB exceeds limit %.2f MB",
+                    filename,
+                    smallest_mb,
+                    target_mb,
+                )
+            continue
 
         prepared.append(
             {
-                "photo_b64": payload,
+                "photo_b64": base64.b64encode(payload_bytes).decode("ascii"),
                 "photo_content_type": _WEBP_MIME,
                 "display_order": index,
             }
@@ -63,8 +83,42 @@ def prepare_photo_entries(
     return prepared
 
 
-def _image_to_webp(image: Image.Image, *, quality: int) -> Optional[str]:
-    """Convert a Pillow image to WebP and return ASCII base64 data."""
+def _encode_with_limit(
+    image: Image.Image,
+    *,
+    quality: int,
+    min_quality: int,
+    max_bytes: int | None,
+) -> tuple[Optional[bytes], Optional[bytes]]:
+    """Return WebP bytes within ``max_bytes`` along with the smallest attempted payload."""
+    best_payload: Optional[bytes] = None
+    for level in _quality_candidates(quality, min_quality):
+        payload = _image_to_webp_bytes(image, quality=level)
+        if not payload:
+            continue
+        if best_payload is None or len(payload) < len(best_payload):
+            best_payload = payload
+        if max_bytes is None or len(payload) <= max_bytes:
+            return payload, best_payload
+
+    return (None, best_payload)
+
+
+def _quality_candidates(start: int, minimum: int) -> list[int]:
+    if start <= minimum:
+        return [max(start, minimum)]
+
+    levels: list[int] = []
+    current = start
+    while current > minimum:
+        levels.append(current)
+        current = max(minimum, current - 10)
+    if not levels or levels[-1] != minimum:
+        levels.append(minimum)
+    return levels
+
+
+def _image_to_webp_bytes(image: Image.Image, *, quality: int) -> Optional[bytes]:
     try:
         image.load()
         converted = image.convert("RGBA" if "A" in image.getbands() else "RGB")
@@ -77,4 +131,12 @@ def _image_to_webp(image: Image.Image, *, quality: int) -> Optional[str]:
     except OSError:
         return None
 
-    return base64.b64encode(buffer.getvalue()).decode("ascii")
+    return buffer.getvalue()
+
+
+def _resolve_max_bytes(value: int | None) -> Optional[int]:
+    if value is None:
+        return _DEFAULT_MAX_BYTES
+    if value <= 0:
+        return None
+    return value

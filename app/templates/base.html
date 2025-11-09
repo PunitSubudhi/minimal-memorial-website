@@ -17,11 +17,7 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-md navbar-light bg-light shadow-sm">
-        <div class="container">
-            <a class="navbar-brand fw-semibold" href="{{ url_for('main.index') }}">Memorial</a>
-        </div>
-    </nav>
+
     <main class="container py-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -39,7 +35,7 @@
     </main>
     <footer class="py-4 bg-light border-top mt-auto">
         <div class="container text-center text-muted small">
-            &copy; {{ current_year or 2025 }} In Loving Memory
+            &copy; {{ current_year or 2025 }} Subudhi Parivar
         </div>
     </footer>
     <script
