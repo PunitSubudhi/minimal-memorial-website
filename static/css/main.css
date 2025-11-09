@@ -13,9 +13,15 @@ h1, h2, h3, h4, h5, h6 {
     margin: 0 auto 1rem;
 }
 
+.carousel-inner {
+    max-height: 420px;
+    overflow: hidden;
+}
+
 .carousel-photo {
     width: 100%;
     height: 420px;
+    max-height: 420px;
     object-fit: contain;
     background-color: #111;
 }
