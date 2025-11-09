@@ -13,7 +13,7 @@ from .services import notifications, storage, tributes
 main_bp = Blueprint("main", __name__)
 
 
-@main_bp.route("/", methods=["GET", "POST"])
+@main_bp.route("/tributes", methods=["GET", "POST"])
 def index() -> str:
     form = TributeForm()
     page_size = current_app.config.get("TRIBUTES_PAGE_SIZE", 12)
@@ -58,6 +58,16 @@ def index() -> str:
         tributes=list(tributes_q),
         carousel_images=carousel_images,
     )
+
+
+@main_bp.route("/", methods=["GET"])
+def home() -> str:
+    """Render a static home page where site owners can add text and images.
+
+    The tributes listing and submission are served from the `index` view at
+    `/tributes` so the public home can be a simple static page.
+    """
+    return render_template("home.html")
 
 
 @main_bp.route("/tributes/<int:tribute_id>")

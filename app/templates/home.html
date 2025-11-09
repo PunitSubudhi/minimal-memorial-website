@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='images/homepagepic.webp') }}" alt="Photo of Shri Jayadev Subudhi" class="img-fluid rounded mx-auto d-block" style="max-height:420px; object-fit:cover;" />
+        </div>
+        <!-- Heading moved into the article below so it shares the same flow and styling -->
+    </div>
+</div>
+<div class="row">
+    <div class="col-12">
+        <article class="mb-4">
+            <header class="mb-3">
+                <p class="lead">The city of Puri lost one of its most respected and pioneering businessmen, Shri Jayadev Subudhi, who passed away at his residence on VIP Road on 6th November 2025, at the age of 85.</p>
+            </header>
+
+            <p>Born on 4th June 1941 at Kalikadevi Sahi, Puri, Shri Subudhi was a visionary entrepreneur whose legacy spans more than seven decades. A third-generation businessman, he played a pivotal role in shaping Puri’s commercial and social landscape. He was instrumental in bringing LPG to Puri in 1966, becoming one of the first LPG gas distributors in Odisha, and later in introducing mobile network services in 1996, marking milestones in the city’s modernization. He also made Puri taste sweeter by bringing Britannia Biscuits to the city in 1956, becoming one of the earliest distributors of the iconic brand in Odisha.</p>
+
+            <p>A Rotarian since 1968, Shri Subudhi also served as President of Kalinga Vaishya Sangha, Puri, and was an Executive Committee Member of Kalinga Vaishya Mahasangha, Odisha. He was associated with many organizations and the Founder of several, including the Odisha LPG Distributors Association, which he established to unite and strengthen the fraternity of LPG entrepreneurs across the state.</p>
+
+            <p>He was an active member of Puri Club, a respected builder, hotelier, philanthropist, and social worker, deeply committed to community welfare. A devout follower of Lord Jagannath, he was a regular visitor to the Jagannath Temple for Mangala Alati and Chamar Seva for more than 40 years, maintaining his spiritual discipline with deep faith.</p>
+
+            <p>He was a mentor to many, an inspirer to all, and a friend to every group — admired for his humility, guidance, and ever-helpful nature.</p>
+
+            <p>More than 500 friends, family members, and business associates visited to pay their last respects. He leaves behind a proud and lasting legacy carried forward by his sons, grandsons, and great-grandsons — collectively known as the Subudhi Parivar.</p>
+
+            <p>Shri Jayadev Subudhi will be remembered as an icon of Puri, a visionary leader, a devout Jagannath Bhakta, and a family man who nurtured unity, values, and integrity across generations.</p>
+
+            <p class="fw-semibold">Om Shanti 🙏</p>
+        </article>
+    </div>
+</div>
+<div class="row">
+    <div class="col-12 text-center mt-4">
+        <p class="small text-muted">To read tributes and share your memories, visit the <a href="{{ url_for('main.index') }}">Tributes page</a>.</p>
+    </div>
+</div>
+{% endblock %}
