@@ -36,9 +36,12 @@
 
         .carousel-photo {
             width: 100%;
-            height: 420px;
+            height: 420px; /* fixed container height so carousel remains consistent */
             max-height: 420px;
             background-color: #111;
+            object-fit: contain; /* preserve intrinsic aspect ratio without distortion */
+            object-position: center center; /* center the image inside the box */
+            display: block;
         }
 
         .placeholder-hero {
