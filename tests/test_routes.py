@@ -7,7 +7,7 @@ from app.services import notifications
 
 
 def test_index_get_renders(client) -> None:
-    response = client.get("/")
+    response = client.get("/tributes")
     assert response.status_code == 200
     assert b"Share a Tribute" in response.data
 
@@ -21,7 +21,7 @@ def test_index_post_creates_tribute(client, app, monkeypatch) -> None:
     monkeypatch.setattr(notifications, "notify_new_tribute", fake_notify)
 
     response = client.post(
-        "/",
+        "/tributes",
         data={"name": "Tester", "message": "A memory"},
         follow_redirects=True,
     )
