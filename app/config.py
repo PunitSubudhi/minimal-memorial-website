@@ -40,6 +40,8 @@ class BaseConfig:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     TRIBUTES_PAGE_SIZE = int(os.getenv("TRIBUTES_PAGE_SIZE", 12))
+    ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
     ALLOWED_EXTENSIONS = tuple(
         ext.strip().lower()
         for ext in os.getenv(

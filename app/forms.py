@@ -5,8 +5,21 @@ from __future__ import annotations
 from flask import current_app
 from flask_wtf import FlaskForm
 from werkzeug.datastructures import FileStorage
-from wtforms import MultipleFileField, StringField, SubmitField, TextAreaField
-from wtforms.validators import DataRequired, Length, ValidationError
+from wtforms import (
+    MultipleFileField,
+    PasswordField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+)
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    Length,
+    Optional,
+    Regexp,
+    ValidationError,
+)
 
 
 class TributeForm(FlaskForm):
@@ -37,3 +50,19 @@ class TributeForm(FlaskForm):
             ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
             if allowed and ext not in allowed:
                 raise ValidationError("One or more files have an unsupported format.")
+
+
+class AdminAuthForm(FlaskForm):
+    """Form for admin authentication to delete tributes."""
+
+    username = StringField(
+        "Admin Username",
+        validators=[DataRequired()],
+        render_kw={"autocomplete": "username"},
+    )
+    password = PasswordField(
+        "Admin Password",
+        validators=[DataRequired()],
+        render_kw={"autocomplete": "current-password"},
+    )
+    submit = SubmitField("Delete Tribute")

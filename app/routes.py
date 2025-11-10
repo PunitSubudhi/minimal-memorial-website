@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, flash, redirect, render_template, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    url_for,
+)
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from .extensions import db
-from .forms import TributeForm
+from .forms import AdminAuthForm, TributeForm
 from .models import Tribute, TributePhoto
 from .services import notifications, storage, tributes
 
@@ -73,8 +80,66 @@ def home() -> str:
 
 @main_bp.route("/tributes/<int:tribute_id>")
 def tribute_detail(tribute_id: int) -> str:
-    tribute = Tribute.query.options(selectinload(Tribute.photos)).get_or_404(tribute_id)
+    tribute = db.session.get(Tribute, tribute_id)
+    if not tribute:
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+    tribute = (
+        Tribute.query.options(selectinload(Tribute.photos))
+        .filter_by(id=tribute_id)
+        .first_or_404()
+    )
     return render_template("tribute_detail.html", tribute=tribute)
+
+
+@main_bp.route("/admin/delete/tribute/<int:tribute_id>", methods=["GET", "POST"])
+def admin_delete_tribute(tribute_id: int) -> str:
+    """Admin-only endpoint to delete a tribute with authentication."""
+    tribute = db.session.get(Tribute, tribute_id)
+    if not tribute:
+        from werkzeug.exceptions import NotFound
+
+        raise NotFound()
+    form = AdminAuthForm()
+
+    if form.validate_on_submit():
+        admin_username = current_app.config.get("ADMIN_USERNAME")
+        admin_password = current_app.config.get("ADMIN_PASSWORD")
+
+        if not admin_username or not admin_password:
+            current_app.logger.error("Admin credentials not configured in environment")
+            flash("Admin authentication is not configured.", "danger")
+            return render_template("admin_delete.html", tribute=tribute, form=form)
+
+        if (
+            form.username.data == admin_username
+            and form.password.data == admin_password
+        ):
+            tribute_name = tribute.name
+
+            try:
+                # Delete associated photos first (cascade should handle this, but being explicit)
+                for photo in tribute.photos:
+                    db.session.delete(photo)
+                db.session.delete(tribute)
+                db.session.commit()
+                current_app.logger.info(
+                    "Admin deleted tribute %s (%s)", tribute_id, tribute_name
+                )
+                flash(f"Tribute from {tribute_name} has been deleted.", "success")
+                return redirect(url_for("main.index"))
+            except Exception:  # pragma: no cover
+                db.session.rollback()
+                current_app.logger.exception("Failed to delete tribute %s", tribute_id)
+                flash("Failed to delete tribute. Please try again.", "danger")
+                return render_template("admin_delete.html", tribute=tribute, form=form)
+        else:
+            flash("Invalid username or password.", "danger")
+            return render_template("admin_delete.html", tribute=tribute, form=form)
+
+    # GET request or validation failed - show authentication form
+    return render_template("admin_delete.html", tribute=tribute, form=form)
 
 
 def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
