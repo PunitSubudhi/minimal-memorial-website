@@ -186,12 +186,12 @@ def test_admin_delete_with_invalid_credentials(client, app, monkeypatch) -> None
     with app.app_context():
         from app.services import tributes
 
-        tribute = tributes.create_tribute(
+        test_tribute = tributes.create_tribute(
             name="Test User",
             message="Test message",
             photo_entries=[],
         )
-        tribute_id = tribute.id
+        tribute_id = test_tribute.id
 
         response = client.post(
             f"/admin/delete/tribute/{tribute_id}",
@@ -206,3 +206,41 @@ def test_admin_delete_with_invalid_credentials(client, app, monkeypatch) -> None
 
         still_exists = db.session.get(Tribute, tribute_id)
         assert still_exists is not None
+
+
+def test_tribute_submission_with_oversized_photo_saved_without_photo(
+    client, app, monkeypatch
+) -> None:
+    """Verify tribute is saved without photo when it exceeds size limit."""
+    from app.services import notifications
+
+    captured: dict[str, object] = {}
+
+    def fake_notify(**payload):  # type: ignore[no-untyped-def]
+        captured.update(payload)
+
+    monkeypatch.setattr(notifications, "notify_new_tribute", fake_notify)
+
+    # Create a very small size limit to trigger size error
+    app.config["MAX_PHOTO_UPLOAD_BYTES"] = 100
+
+    response = client.post(
+        "/tributes",
+        data={
+            "name": "Test User",
+            "message": "Test message",
+            "photos": [],
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        tribute_count = Tribute.query.count()
+        assert tribute_count == 1
+        tribute = Tribute.query.first()
+        assert tribute is not None
+        assert tribute.name == "Test User"
+        assert len(tribute.photos) == 0  # No photos should be saved
+        assert captured["tribute_id"] == tribute.id
