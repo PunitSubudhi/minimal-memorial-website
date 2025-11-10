@@ -11,8 +11,7 @@ def test_create_tribute_persists_data(app, db_session) -> None:
         tribute = tributes.create_tribute(
             name="Test Name",
             message="Heartfelt message",
-            photo_entries=
-            [
+            photo_entries=[
                 {
                     "photo_b64": "Zm9vYmFy",
                     "photo_content_type": "image/webp",

@@ -9,7 +9,9 @@ from typing import Type
 _BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def _resolve_database_uri(env_name: str = "DATABASE_URL", *, default: str | None = None) -> str:
+def _resolve_database_uri(
+    env_name: str = "DATABASE_URL", *, default: str | None = None
+) -> str:
     url = os.getenv(env_name)
     if not url:
         if default is not None:
