@@ -70,7 +70,7 @@ def index() -> str:
     )
 
 
-@main_bp.route("/", methods=["GET"])
+@main_bp.route("/home", methods=["GET"])
 def home() -> str:
     """Render a static home page where site owners can add text and images.
 
@@ -80,7 +80,7 @@ def home() -> str:
     return render_template("home.html")
 
 
-@main_bp.route("/invitation", methods=["GET"])
+@main_bp.route("/", methods=["GET"])
 def invitation() -> str:
     contacts = current_app.config.get("INVITATION_CONTACTS") or [
         {
