@@ -16,15 +16,25 @@ def create_tribute(
     name: str,
     message: str,
     photo_entries: Iterable[Mapping[str, object]],
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
     extra_fields: Optional[dict] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Tribute:
     """Persist a tribute and any associated photo records."""
     log = logger or LOGGER
+
+    # Merge contact info into extra_fields
+    fields = extra_fields or {}
+    if phone:
+        fields["phone"] = phone.strip()
+    if email:
+        fields["email"] = email.strip().lower()
+
     tribute = Tribute(
         name=name.strip(),
         message=message.strip(),
-        extra_fields=extra_fields or {},
+        extra_fields=fields,
     )
     db.session.add(tribute)
 

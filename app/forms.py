@@ -36,6 +36,20 @@ class TributeForm(FlaskForm):
             "placeholder": "Share a favorite memory, message of support, or story.",
         },
     )
+    phone = StringField(
+        "Phone Number (optional)",
+        validators=[
+            Optional(),
+            Length(max=20),
+            Regexp(r"^[\d\s\-\+\(\)\.]+$", message="Invalid phone number format"),
+        ],
+        render_kw={"placeholder": "e.g., +91 9987654321"},
+    )
+    email = StringField(
+        "Email Address (optional)",
+        validators=[Optional(), Email(), Length(max=120)],
+        render_kw={"placeholder": "your.email@example.com", "type": "email"},
+    )
     photos = MultipleFileField("Upload Photos (optional)")
     submit = SubmitField("Share Tribute")
 

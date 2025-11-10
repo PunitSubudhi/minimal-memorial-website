@@ -37,6 +37,8 @@ def index() -> str:
                 name=form.name.data,
                 message=form.message.data,
                 photo_entries=entries,
+                phone=form.phone.data,
+                email=form.email.data,
             )
         except Exception:  # pragma: no cover - defensive server guard
             db.session.rollback()
