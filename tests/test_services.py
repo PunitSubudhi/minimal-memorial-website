@@ -1,4 +1,5 @@
 """Tests for tribute service helpers."""
+
 from __future__ import annotations
 
 from app.models import Tribute, TributePhoto

@@ -1,4 +1,5 @@
 """Helpers for validating and normalizing tribute photo uploads."""
+
 from __future__ import annotations
 
 import base64

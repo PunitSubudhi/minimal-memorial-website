@@ -1,4 +1,5 @@
 """Entry point for running the memorial Flask application."""
+
 from dotenv import load_dotenv
 
 load_dotenv()

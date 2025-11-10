@@ -1,4 +1,5 @@
 """Configuration helpers for the memorial application."""
+
 from __future__ import annotations
 
 import os

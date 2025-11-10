@@ -1,4 +1,5 @@
 """Application factory for the memorial site."""
+
 from datetime import UTC, datetime
 from pathlib import Path
 

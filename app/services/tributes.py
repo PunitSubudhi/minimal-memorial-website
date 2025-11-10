@@ -1,4 +1,5 @@
 """Service helpers for managing tribute records."""
+
 from __future__ import annotations
 
 import logging

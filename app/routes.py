@@ -1,4 +1,5 @@
 """HTTP routes for the memorial application."""
+
 from __future__ import annotations
 
 from flask import Blueprint, current_app, flash, redirect, render_template, url_for

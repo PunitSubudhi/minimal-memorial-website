@@ -1,4 +1,5 @@
 """Route-level integration tests."""
+
 from __future__ import annotations
 
 from app.models import Tribute

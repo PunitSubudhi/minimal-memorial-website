@@ -1,4 +1,5 @@
 """Database models for the memorial application."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
