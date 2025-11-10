@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Home{% endblock %}
 {% block content %}
+<style>
+        .cta-card {
+        background: linear-gradient(135deg, rgba(125, 138, 181, 0.1), rgba(255, 255, 255, 0.6));
+        border: 2px solid rgba(125, 138, 181, 0.3);
+        padding: 2rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-top: 2rem;
+    }
+</style>
 <div class="row">
     <div class="col-12">
         <div class="text-center mb-4">
@@ -12,9 +22,7 @@
 <div class="row">
     <div class="col-12">
         <article class="mb-4">
-            <header class="mb-3">
-                <p class="lead">The city of Puri lost one of its most respected and pioneering businessmen, Shri Jayadev Subudhi, who passed away at his residence on VIP Road on 6th November 2025, at the age of 85.</p>
-            </header>
+            <p>The city of Puri lost one of its most respected and pioneering businessmen, Shri Jayadev Subudhi, who passed away at his residence on VIP Road on 6th November 2025, at the age of 85.</p>
 
             <p>Born on 4th June 1941 at Kalikadevi Sahi, Puri, Shri Subudhi was a visionary entrepreneur whose legacy spans more than seven decades. A third-generation businessman, he played a pivotal role in shaping Puri’s commercial and social landscape. He was instrumental in bringing LPG to Puri in 1966, becoming one of the first LPG gas distributors in Odisha, and later in introducing mobile network services in 1996, marking milestones in the city’s modernization. He also made Puri taste sweeter by bringing Britannia Biscuits to the city in 1956, becoming one of the earliest distributors of the iconic brand in Odisha.</p>
 
@@ -32,9 +40,15 @@
         </article>
     </div>
 </div>
-<div class="row">
-    <div class="col-12 text-center mt-4">
-        <p class="small text-muted">To read tributes and share your memories, visit the <a href="{{ url_for('main.index') }}">Tributes page</a>.</p>
-    </div>
-</div>
+
+        <!-- CTA: Add Tributes -->
+        <section>
+            <div class="cta-card">
+                <h3>Share your memories</h3>
+                <p>Click below to add your tribute and share your cherished memories.</p>
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg">
+                    Add a Tribute
+                </a>
+            </div>
+        </section>
 {% endblock %}
