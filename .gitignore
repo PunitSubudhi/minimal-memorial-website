@@ -19,3 +19,5 @@ wheels/
 .pem
 *.log
 *.pem
+# Local planning / migration notes (keep private)
+.github/S3_CloudFront_migration_plan.md
