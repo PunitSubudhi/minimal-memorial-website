@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from time import monotonic
+from types import SimpleNamespace
+from typing import Any
+
 from flask import (
     Blueprint,
     current_app,
@@ -21,17 +25,26 @@ from .services import notifications, storage, tributes
 main_bp = Blueprint("main", __name__)
 
 
+_CAROUSEL_CACHE: dict[int, tuple[float, list[dict[str, str]]]] = {}
+_TRIBUTES_CACHE: dict[int, tuple[float, list[dict[str, Any]]]] = {}
+
+
 @main_bp.route("/tributes", methods=["GET", "POST"])
 def index() -> str:
     form = TributeForm()
     page_size = current_app.config.get("TRIBUTES_PAGE_SIZE", 12)
 
     if form.validate_on_submit():
-        entries = storage.prepare_photo_entries(
+        entries, had_size_error = storage.prepare_photo_entries(
             form.photos.data or [],
             logger=current_app.logger,
             max_bytes=current_app.config.get("MAX_PHOTO_UPLOAD_BYTES"),
         )
+        if had_size_error:
+            flash(
+                "Some photos were too large and were skipped. Smaller files work best.",
+                "warning",
+            )
         try:
             tribute = tributes.create_tribute(
                 name=form.name.data,
@@ -53,19 +66,16 @@ def index() -> str:
                 tribute_name=tribute.name,
                 tribute_message=tribute.message,
             )
+            _invalidate_carousel_cache()
+            _invalidate_tributes_cache()
             flash("Thank you for sharing your tribute.", "success")
             return redirect(url_for("main.index"))
 
-    tributes_q = (
-        Tribute.query.options(selectinload(Tribute.photos))
-        .order_by(Tribute.created_at.desc())
-        .limit(page_size)
-    )
     carousel_images = _collect_carousel_images(limit=8)
     return render_template(
         "index.html",
         form=form,
-        tributes=list(tributes_q),
+        tributes=_get_cached_tributes(limit=page_size),
         carousel_images=carousel_images,
     )
 
@@ -156,6 +166,8 @@ def admin_delete_tribute(tribute_id: int) -> str:
                 current_app.logger.info(
                     "Admin deleted tribute %s (%s)", tribute_id, tribute_name
                 )
+                _invalidate_carousel_cache()
+                _invalidate_tributes_cache()
                 flash(f"Tribute from {tribute_name} has been deleted.", "success")
                 return redirect(url_for("main.index"))
             except Exception:  # pragma: no cover
@@ -175,6 +187,17 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
     """Return up to ``limit`` unique tribute photo payloads for the carousel."""
     if limit <= 0:
         return []
+
+    cache_ttl = current_app.config.get("CAROUSEL_CACHE_SECONDS", 300)
+    cache_key = limit
+    now = monotonic()
+
+    if cache_ttl and cache_ttl > 0:
+        cached = _CAROUSEL_CACHE.get(cache_key)
+        if cached:
+            cached_at, cached_items = cached
+            if now - cached_at < cache_ttl:
+                return list(cached_items)
 
     oversample = max(limit * 3, limit)
     photos = (
@@ -200,4 +223,73 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
         if len(carousel_items) >= limit:
             break
 
+    if cache_ttl and cache_ttl > 0:
+        _CAROUSEL_CACHE[cache_key] = (now, list(carousel_items))
+
     return carousel_items
+
+
+def _invalidate_carousel_cache() -> None:
+    _CAROUSEL_CACHE.clear()
+
+
+def _get_cached_tributes(*, limit: int) -> list[SimpleNamespace]:
+    if limit <= 0:
+        return []
+
+    cache_ttl = current_app.config.get("TRIBUTES_CACHE_SECONDS", 300)
+    now = monotonic()
+    cache_key = limit
+
+    if cache_ttl and cache_ttl > 0:
+        cached = _TRIBUTES_CACHE.get(cache_key)
+        if cached:
+            cached_at, cached_items = cached
+            if now - cached_at < cache_ttl:
+                return [_namespace_tribute(item) for item in cached_items]
+
+    tributes_q = (
+        Tribute.query.options(selectinload(Tribute.photos))
+        .order_by(Tribute.created_at.desc())
+        .limit(limit)
+    )
+    tributes_serialized = [_serialize_tribute(model) for model in tributes_q]
+
+    if cache_ttl and cache_ttl > 0:
+        # store serialized payload only so SQLAlchemy objects are not cached directly
+        _TRIBUTES_CACHE[cache_key] = (now, tributes_serialized)
+
+    return [_namespace_tribute(item) for item in tributes_serialized]
+
+
+def _invalidate_tributes_cache() -> None:
+    _TRIBUTES_CACHE.clear()
+
+
+def _serialize_tribute(model: Tribute) -> dict[str, Any]:
+    return {
+        "id": model.id,
+        "name": model.name,
+        "message": model.message,
+        "created_at": model.created_at,
+        "photos": [
+            {
+                "id": photo.id,
+                "photo_b64": photo.photo_b64,
+                "photo_content_type": photo.photo_content_type,
+                "caption": photo.caption,
+            }
+            for photo in model.photos or []
+        ],
+    }
+
+
+def _namespace_tribute(payload: dict[str, Any]) -> SimpleNamespace:
+    photos = [SimpleNamespace(**photo) for photo in payload.get("photos", [])]
+    return SimpleNamespace(
+        id=payload["id"],
+        name=payload["name"],
+        message=payload["message"],
+        created_at=payload["created_at"],
+        photos=photos,
+    )
