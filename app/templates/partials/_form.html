@@ -21,7 +21,7 @@
                 <div class="col-md-6 mb-3">
                     {{ form.phone.label(class_="form-label") }}
                     {{ form.phone(class_="form-control", maxlength=20) }}
-                    <div class="form-text">Optional - for organizers only, never displayed publicly</div>
+                    <div class="form-text">Optional - for family to get in touch with you</div>
                     {% for error in form.phone.errors %}
                         <div class="invalid-feedback d-block">{{ error }}</div>
                     {% endfor %}
@@ -29,7 +29,7 @@
                 <div class="col-md-6 mb-3">
                     {{ form.email.label(class_="form-label") }}
                     {{ form.email(class_="form-control", maxlength=120, type="email") }}
-                    <div class="form-text">Optional - for organizers only, never displayed publicly</div>
+                    <div class="form-text">Optional - for family to get in touch with you</div>
                     {% for error in form.email.errors %}
                         <div class="invalid-feedback d-block">{{ error }}</div>
                     {% endfor %}
@@ -38,7 +38,7 @@
             <div class="mb-3">
                 {{ form.photos.label(class_="form-label") }}
                 {{ form.photos(class_="form-control", multiple=true) }}
-                <div class="form-text">Accepted formats: {{ ', '.join(config.get('ALLOWED_EXTENSIONS', ())) }}</div>
+                <div class="form-text">Accepted formats: {{ ', '.join(config.get('ALLOWED_EXTENSIONS', ())) }}. Maximum 2 MB per image.</div>
                 {% for error in form.photos.errors %}
                     <div class="invalid-feedback d-block">{{ error }}</div>
                 {% endfor %}
