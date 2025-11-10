@@ -29,11 +29,17 @@ def prepare_photo_entries(
     quality: int = 85,
     max_bytes: int | None = None,
     min_quality: int = 30,
-) -> List[dict[str, str | int]]:
-    """Convert uploads to base64-encoded WebP payloads with optional size caps."""
+) -> tuple[List[dict[str, str | int]], bool]:
+    """Convert uploads to base64-encoded WebP payloads with optional size caps.
+    
+    Returns:
+        A tuple of (prepared_entries, had_size_error) where had_size_error indicates
+        if any photos were rejected due to exceeding the size limit.
+    """
     prepared: List[dict[str, str | int]] = []
     log = logger or LOGGER
     size_cap = _resolve_max_bytes(max_bytes)
+    had_size_error = False
 
     for index, storage in enumerate(files or []):
         if not isinstance(storage, FileStorage):
@@ -71,6 +77,7 @@ def prepare_photo_entries(
                     smallest_mb,
                     target_mb,
                 )
+                had_size_error = True
             continue
 
         prepared.append(
@@ -81,7 +88,7 @@ def prepare_photo_entries(
             }
         )
 
-    return prepared
+    return prepared, had_size_error
 
 
 def _encode_with_limit(
