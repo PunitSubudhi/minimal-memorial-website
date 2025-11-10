@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Invitation - In Loving Memory{% endblock %}
+
+{% block extra_head %}
+<style>
+    .map-responsive {
+        position: relative;
+        padding-bottom: 56.25%;
+        height: 0;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+
+    .map-responsive iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+
+    .contact-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        height: 100%;
+    }
+
+    .contact-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+    }
+
+    .hero-image {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        object-fit: cover;
+    }
+
+    .event-details-card {
+        background-color: #fff;
+        border: 1px solid #e9ecef;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+
+    .event-detail-line {
+        font-size: 1.1rem;
+        margin: 0.5rem 0;
+    }
+
+    .maps-link-btn {
+        margin-top: 1rem;
+    }
+
+    .cta-card {
+        background: linear-gradient(135deg, rgba(125, 138, 181, 0.1), rgba(255, 255, 255, 0.6));
+        border: 2px solid rgba(125, 138, 181, 0.3);
+        padding: 2rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .cta-card h3 {
+        margin-bottom: 1rem;
+    }
+
+    .contact-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .contact-card-inner {
+        border: 1px solid #e9ecef;
+        padding: 1.5rem;
+        border-radius: 8px;
+        background-color: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .contact-card-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .contact-card-phone {
+        font-size: 1rem;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Hero Image -->
+        <img
+            src="https://778bff83-75d6-44df-b16e-6f9c816261c4.s3.us-east-2.amazonaws.com/recipe-images/homepagepic.webp"
+            alt="Memorial event hero image"
+            class="hero-image w-100"
+        />
+
+        <!-- Event Details -->
+        <section class="mb-5">
+            <h2 class="mb-3">Event Details</h2>
+            <div class="event-details-card">
+                <div class="event-detail-line">
+                    <strong>🗓️ 16 November, Sunday</strong>
+                </div>
+                <div class="event-detail-line">
+                    <strong>🕣 7:00 PM</strong>
+                </div>
+            </div>
+        </section>
+
+        <!-- Event Location & Map -->
+        <section class="mb-5">
+            <h2 class="mb-3">Event Location</h2>
+            <div class="map-responsive">
+<iframe src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d3753.3974785069845!2d85.8337167!3d19.8231279!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a19c6bbfa78f6f3%3A0x23ebfd42a24f7524!2z4Ky44Ky-4KyHIOCsleCssuCtjeCtn-CsvuCsoyDgrK7grKPgrY3grKHgrKogU2FpIEthbHlhbiBNYW5kYXA!5e0!3m2!1sen!2suk!4v1762792926466!5m2!1sen!2suk" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+            <div class="d-flex justify-content-center maps-link-btn">
+                <a
+                    href="https://www.google.com/maps/place/Jayadev+Subudhi/@20.281127,85.82309,15z"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-primary"
+                >
+                    Open in Google Maps
+                </a>
+            </div>
+        </section>
+
+        <!-- Get in Touch -->
+        <section class="mb-5">
+            <h2 class="mb-4">Get in touch</h2>
+            <p class="mb-3">Click below to contact us on WhatsApp</p>
+            <div class="contact-cards-grid">
+                {% for contact in contacts %}
+                <a
+                    href="https://wa.me/{{ contact.phone_link }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="contact-card"
+                >
+                    <div class="contact-card-inner">
+                        <div class="contact-card-name">{{ contact.name }}</div>
+                        <div class="contact-card-phone">{{ contact.phone_display }}</div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- CTA: Add Tributes -->
+        <section>
+            <div class="cta-card">
+                <h3>Share your memories</h3>
+                <p>Click below to add your tribute and share your cherished memories.</p>
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary btn-lg">
+                    Add a Tribute
+                </a>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

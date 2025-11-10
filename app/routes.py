@@ -80,6 +80,33 @@ def home() -> str:
     return render_template("home.html")
 
 
+@main_bp.route("/invitation", methods=["GET"])
+def invitation() -> str:
+    contacts = current_app.config.get("INVITATION_CONTACTS") or [
+        {
+            "name": "Debadutta Subudhi",
+            "phone_display": "+91 94377 22222",
+            "phone_link": "919437722222",
+        },
+        {
+            "name": "Sibadutta Subudhi",
+            "phone_display": "+91 94371 01010",
+            "phone_link": "919437101010",
+        },
+        {
+            "name": "Bibhudutta Subudhi",
+            "phone_display": "+91 9861080610",
+            "phone_link": "919861080610",
+        },
+        {
+            "name": "Pravudutta Subudhi",
+            "phone_display": "+91 98611 66666",
+            "phone_link": "919861166666",
+        },
+    ]
+    return render_template("invitation.html", contacts=contacts)
+
+
 @main_bp.route("/tributes/<int:tribute_id>")
 def tribute_detail(tribute_id: int) -> str:
     tribute = db.session.get(Tribute, tribute_id)
