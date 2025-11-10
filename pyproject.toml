@@ -15,4 +15,6 @@ dependencies = [
 	"pillow-heif",
 	"requests",
 	"pytest",
+	"email-validator>=2.3.0",
+	"gunicorn>=23.0.0",
 ]
