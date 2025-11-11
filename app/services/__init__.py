@@ -1,3 +1,3 @@
 """Service package exports."""
 
-from . import notifications, storage, tributes  # noqa: F401
+from . import notifications, s3, storage, tributes  # noqa: F401
