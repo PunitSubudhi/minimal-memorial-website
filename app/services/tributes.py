@@ -39,15 +39,17 @@ def create_tribute(
     db.session.add(tribute)
 
     for entry in photo_entries:
-        photo_b64 = str(entry.get("photo_b64", ""))
+        photo_b64 = str(entry.get("photo_b64", "")) if entry.get("photo_b64") else None
+        photo_s3_key = str(entry.get("photo_s3_key")) if entry.get("photo_s3_key") else None
         content_type = str(entry.get("photo_content_type", ""))
         display_order = int(entry.get("display_order", 0))
         caption = entry.get("caption")
-        if not photo_b64:
+        if not (photo_b64 or photo_s3_key):
             continue
         tribute.photos.append(
             TributePhoto(
                 photo_b64=photo_b64,
+                photo_s3_key=photo_s3_key,
                 photo_content_type=content_type or "image/webp",
                 display_order=display_order,
                 caption=str(caption) if caption is not None else None,

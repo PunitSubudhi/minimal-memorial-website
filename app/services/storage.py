@@ -1,14 +1,17 @@
-"""Helpers for validating and normalizing tribute photo uploads."""
+"""Helpers for validating, normalizing, and storing tribute photo uploads."""
 
 from __future__ import annotations
 
 import base64
 import io
 import logging
+from flask import current_app, has_app_context
 from typing import Iterable, List, Optional
 
 from PIL import Image, UnidentifiedImageError
 from werkzeug.datastructures import FileStorage
+
+from . import s3
 
 try:  # pragma: no cover - defensive guard for optional dependency
     import pillow_heif
@@ -29,14 +32,12 @@ def prepare_photo_entries(
     quality: int = 85,
     max_bytes: int | None = None,
     min_quality: int = 30,
-) -> tuple[List[dict[str, str | int]], bool]:
-    """Convert uploads to base64-encoded WebP payloads with optional size caps.
-    
-    Returns:
-        A tuple of (prepared_entries, had_size_error) where had_size_error indicates
-        if any photos were rejected due to exceeding the size limit.
-    """
-    prepared: List[dict[str, str | int]] = []
+) -> tuple[List[dict[str, object]], bool]:
+    """Normalize uploads, preferring S3 storage with base64 fallback.
+
+    Returns a tuple of (prepared_entries, had_size_error) where had_size_error
+    indicates if any photos were rejected for exceeding the size cap."""
+    prepared: List[dict[str, object]] = []
     log = logger or LOGGER
     size_cap = _resolve_max_bytes(max_bytes)
     had_size_error = False
@@ -80,15 +81,53 @@ def prepare_photo_entries(
                 had_size_error = True
             continue
 
-        prepared.append(
-            {
-                "photo_b64": base64.b64encode(payload_bytes).decode("ascii"),
-                "photo_content_type": _WEBP_MIME,
-                "display_order": index,
-            }
+        entry = {
+            "photo_content_type": _WEBP_MIME,
+            "display_order": index,
+        }
+
+        upload_key, _ = _store_in_s3(
+            payload_bytes,
+            content_type=_WEBP_MIME,
+            filename_hint=filename,
+            logger=log,
         )
 
+        if upload_key:
+            entry["photo_s3_key"] = upload_key
+        else:
+            entry["photo_b64"] = base64.b64encode(payload_bytes).decode("ascii")
+
+        prepared.append(entry)
+
     return prepared, had_size_error
+
+
+def _store_in_s3(
+    payload: bytes,
+    *,
+    content_type: str,
+    filename_hint: str,
+    logger: logging.Logger,
+) -> tuple[Optional[str], Optional[str]]:
+    if not has_app_context():
+        return None, None
+    if not current_app.config.get("S3_BUCKET_NAME"):
+        return None, None
+    try:
+        key, url = s3.upload_bytes(
+            payload,
+            content_type=content_type,
+            filename_hint=filename_hint,
+        )
+        return key, url
+    except s3.S3ConfigurationError:
+        logger.debug("S3 configuration missing; falling back to inline storage")
+    except s3.S3Error:
+        logger.warning("Failed to upload photo to S3; storing inline instead", exc_info=True)
+    except Exception:  # pragma: no cover - unexpected failure during upload
+        logger.exception("Unexpected error uploading photo to S3; storing inline")
+    return None, None
 
 
 def _encode_with_limit(

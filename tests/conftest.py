@@ -14,8 +14,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from app import create_app
-from app.extensions import db as _db
+from app import create_app  # noqa: E402
+from app.extensions import db as _db  # noqa: E402
+from app.routes import _invalidate_carousel_cache, _invalidate_tributes_cache  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -56,3 +57,13 @@ def db_session(app):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _reset_route_caches():
+    """Ensure per-request caches do not leak between tests."""
+    _invalidate_carousel_cache()
+    _invalidate_tributes_cache()
+    yield
+    _invalidate_carousel_cache()
+    _invalidate_tributes_cache()

@@ -105,3 +105,48 @@ def test_prepare_photo_entries_flags_size_error() -> None:
 
     assert result == []
     assert had_size_error is True
+
+
+def test_prepare_photo_entries_uses_s3_when_configured(app, monkeypatch) -> None:
+    data = _make_png()
+    file_storage = FileStorage(
+        stream=io.BytesIO(data),
+        filename="upload.png",
+        content_type="image/png",
+    )
+
+    with app.app_context():
+        app.config["S3_BUCKET_NAME"] = "test-bucket"
+
+        monkeypatch.setattr(
+            storage.s3,
+            "upload_bytes",
+            lambda payload, **kwargs: ("tributes/1/upload.webp", "https://cdn/u"),
+        )
+
+        result, had_size_error = storage.prepare_photo_entries([file_storage])
+
+    assert had_size_error is False
+    assert result[0]["photo_s3_key"] == "tributes/1/upload.webp"
+    assert "photo_b64" not in result[0]
+
+
+def test_prepare_photo_entries_falls_back_to_inline_on_s3_failure(app, monkeypatch) -> None:
+    data = _make_png()
+    file_storage = FileStorage(
+        stream=io.BytesIO(data),
+        filename="fallback.png",
+        content_type="image/png",
+    )
+
+    def _raise(*_args, **_kwargs):
+        raise storage.s3.S3Error("failed")
+
+    with app.app_context():
+        app.config["S3_BUCKET_NAME"] = "test-bucket"
+        monkeypatch.setattr(storage.s3, "upload_bytes", _raise)
+
+        result, had_size_error = storage.prepare_photo_entries([file_storage])
+
+    assert had_size_error is False
+    assert "photo_b64" in result[0]

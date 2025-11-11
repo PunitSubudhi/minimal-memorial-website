@@ -49,10 +49,13 @@ class TributePhoto(db.Model):
         db.ForeignKey("tributes.id", ondelete="CASCADE"),
         nullable=False,
     )
-    photo_b64 = db.Column(db.Text, nullable=False)
+    photo_b64 = db.Column(db.Text, nullable=True)
     photo_content_type = db.Column(db.String(64), nullable=False)
     display_order = db.Column(db.Integer, nullable=False, default=0)
     caption = db.Column(db.String(255))
+    photo_s3_key = db.Column(db.String(512))
+    photo_url = db.Column(db.Text)
+    migrated_at = db.Column(db.DateTime(timezone=True))
 
     tribute = db.relationship("Tribute", back_populates="photos")
 
@@ -62,4 +65,7 @@ class TributePhoto(db.Model):
             "photo_content_type": self.photo_content_type,
             "display_order": self.display_order,
             "caption": self.caption,
+            "photo_url": self.photo_url,
+            "photo_s3_key": self.photo_s3_key,
+            "photo_b64": self.photo_b64,
         }

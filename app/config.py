@@ -51,6 +51,16 @@ class BaseConfig:
     TRIBUTES_PAGE_SIZE = int(os.getenv("TRIBUTES_PAGE_SIZE", 12))
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+    AWS_REGION = os.getenv("AWS_REGION")
+    S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+    S3_BUCKET_PREFIX = os.getenv("S3_BUCKET_PREFIX", "")
+    S3_PUBLIC_BASE_URL = os.getenv("S3_PUBLIC_BASE_URL") or os.getenv(
+        "S3_PUBLIC_DOMAIN"
+    )
+    S3_USE_OAC = os.getenv("S3_USE_OAC")
+    S3_OBJECT_ACL = os.getenv("S3_OBJECT_ACL")
+    S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
+    S3_PRESIGNED_TTL = int(os.getenv("S3_PRESIGNED_TTL", 300))
     ALLOWED_EXTENSIONS = tuple(
         ext.strip().lower()
         for ext in os.getenv(
