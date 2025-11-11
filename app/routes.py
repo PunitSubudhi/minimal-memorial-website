@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from time import monotonic
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Mapping
 
 from flask import (
     Blueprint,
@@ -25,8 +25,32 @@ from .services import notifications, s3, storage, tributes
 main_bp = Blueprint("main", __name__)
 
 
-_CAROUSEL_CACHE: dict[int, tuple[float, list[dict[str, str]]]] = {}
+_CAROUSEL_CACHE: dict[int, tuple[float, list[dict[str, Any]]]] = {}
 _TRIBUTES_CACHE: dict[int, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _resolve_cache_ttl(config_key: str, default: int) -> int:
+    raw_value = current_app.config.get(config_key, default)
+    try:
+        ttl = int(raw_value)
+    except (TypeError, ValueError):
+        ttl = default
+
+    if ttl <= 0:
+        return 0
+
+    presigned_raw = current_app.config.get("S3_PRESIGNED_TTL", 0)
+    try:
+        presigned_ttl = int(presigned_raw)
+    except (TypeError, ValueError):
+        presigned_ttl = 0
+
+    if presigned_ttl > 0:
+        safety_margin = 15 if presigned_ttl > 30 else 5
+        max_allowed = max(presigned_ttl - safety_margin, 1)
+        ttl = min(ttl, max_allowed)
+
+    return ttl
 
 
 @main_bp.route("/tributes", methods=["GET", "POST"])
@@ -129,7 +153,9 @@ def tribute_detail(tribute_id: int) -> str:
         .filter_by(id=tribute_id)
         .first_or_404()
     )
-    return render_template("tribute_detail.html", tribute=tribute)
+    tribute_payload = _serialize_tribute(tribute)
+    tribute_namespace = _namespace_tribute(tribute_payload)
+    return render_template("tribute_detail.html", tribute=tribute_namespace)
 
 
 @main_bp.route("/admin/delete/tribute/<int:tribute_id>", methods=["GET", "POST"])
@@ -197,7 +223,7 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
     if limit <= 0:
         return []
 
-    cache_ttl = current_app.config.get("CAROUSEL_CACHE_SECONDS", 300)
+    cache_ttl = _resolve_cache_ttl("CAROUSEL_CACHE_SECONDS", 300)
     cache_key = limit
     now = monotonic()
 
@@ -206,12 +232,14 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
         if cached:
             cached_at, cached_items = cached
             if now - cached_at < cache_ttl:
-                return list(cached_items)
+                hydrated = [_hydrate_carousel_item(item) for item in cached_items]
+                return [item for item in hydrated if item]
 
     oversample = max(limit * 3, limit)
     photos = (
         TributePhoto.query.filter(
             or_(
+                TributePhoto.photo_s3_key.isnot(None),
                 TributePhoto.photo_url.isnot(None),
                 TributePhoto.photo_b64.isnot(None),
             )
@@ -223,6 +251,7 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
 
     carousel_items: list[dict[str, str]] = []
     seen_payloads: set[str] = set()
+    cached_descriptors: list[dict[str, Any]] = []
 
     for photo in photos:
         identifier = (
@@ -234,21 +263,27 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
             continue
         seen_payloads.add(identifier)
 
-        if photo.photo_url:
-            src = photo.photo_url
-        else:
-            payload = photo.photo_b64 or ""
-            if not payload:
-                continue
-            src = f"data:{photo.photo_content_type};base64,{payload}"
-        alt = photo.caption or f"Tribute photo {photo.id}"
-        carousel_items.append({"src": src, "alt": alt})
+        descriptor = {
+            "id": photo.id,
+            "photo_s3_key": photo.photo_s3_key,
+            "photo_b64": photo.photo_b64,
+            "photo_content_type": photo.photo_content_type,
+            "caption": photo.caption,
+            "photo_url": photo.photo_url,
+        }
+
+        hydrated = _hydrate_carousel_item(descriptor)
+        if not hydrated:
+            continue
+
+        carousel_items.append(hydrated)
+        cached_descriptors.append(descriptor)
 
         if len(carousel_items) >= limit:
             break
 
     if cache_ttl and cache_ttl > 0:
-        _CAROUSEL_CACHE[cache_key] = (now, list(carousel_items))
+        _CAROUSEL_CACHE[cache_key] = (now, cached_descriptors)
 
     return carousel_items
 
@@ -261,7 +296,7 @@ def _get_cached_tributes(*, limit: int) -> list[SimpleNamespace]:
     if limit <= 0:
         return []
 
-    cache_ttl = current_app.config.get("TRIBUTES_CACHE_SECONDS", 300)
+    cache_ttl = _resolve_cache_ttl("TRIBUTES_CACHE_SECONDS", 300)
     now = monotonic()
     cache_key = limit
 
@@ -296,6 +331,7 @@ def _serialize_tribute(model: Tribute) -> dict[str, Any]:
         "name": model.name,
         "message": model.message,
         "created_at": model.created_at,
+        "extra_fields": model.extra_fields or {},
         "photos": [
             {
                 "id": photo.id,
@@ -303,6 +339,7 @@ def _serialize_tribute(model: Tribute) -> dict[str, Any]:
                 "photo_content_type": photo.photo_content_type,
                 "caption": photo.caption,
                 "photo_url": photo.photo_url,
+                "photo_s3_key": photo.photo_s3_key,
             }
             for photo in model.photos or []
         ],
@@ -310,11 +347,62 @@ def _serialize_tribute(model: Tribute) -> dict[str, Any]:
 
 
 def _namespace_tribute(payload: dict[str, Any]) -> SimpleNamespace:
-    photos = [SimpleNamespace(**photo) for photo in payload.get("photos", [])]
+    photos_payload = payload.get("photos", [])
+    photos: list[SimpleNamespace] = []
+    for photo in photos_payload:
+        resolved_url = _resolve_photo_src(photo)
+        photos.append(
+            SimpleNamespace(
+                id=photo.get("id"),
+                photo_b64=photo.get("photo_b64"),
+                photo_content_type=photo.get("photo_content_type"),
+                caption=photo.get("caption"),
+                photo_s3_key=photo.get("photo_s3_key"),
+                photo_url=resolved_url,
+            )
+        )
     return SimpleNamespace(
         id=payload["id"],
         name=payload["name"],
         message=payload["message"],
         created_at=payload["created_at"],
         photos=photos,
+        extra_fields=payload.get("extra_fields") or {},
     )
+
+
+def _hydrate_carousel_item(payload: Mapping[str, Any]) -> dict[str, str] | None:
+    src = _resolve_photo_src(payload)
+    if not src:
+        return None
+    identifier = payload.get("id")
+    alt_fallback = f"Tribute photo {identifier}" if identifier else "Tribute photo"
+    alt = payload.get("caption") or alt_fallback
+    return {"src": src, "alt": alt}
+
+
+def _resolve_photo_src(photo: Mapping[str, Any] | Any) -> str | None:
+    def _peek(attr: str) -> Any:
+        if isinstance(photo, Mapping):
+            return photo.get(attr)
+        return getattr(photo, attr, None)
+
+    key = _peek("photo_s3_key")
+    if key:
+        try:
+            return s3.generate_presigned_get_url(key)
+        except (s3.S3Error, ValueError):
+            current_app.logger.warning(
+                "Failed to generate presigned URL for key %s", key, exc_info=True
+            )
+
+    stored_url = _peek("photo_url")
+    if stored_url:
+        return stored_url
+
+    payload = _peek("photo_b64")
+    if payload:
+        content_type = _peek("photo_content_type") or "image/webp"
+        return f"data:{content_type};base64,{payload}"
+
+    return None

@@ -67,4 +67,5 @@ class TributePhoto(db.Model):
             "caption": self.caption,
             "photo_url": self.photo_url,
             "photo_s3_key": self.photo_s3_key,
+            "photo_b64": self.photo_b64,
         }

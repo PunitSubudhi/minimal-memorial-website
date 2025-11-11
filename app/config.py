@@ -60,6 +60,7 @@ class BaseConfig:
     S3_USE_OAC = os.getenv("S3_USE_OAC")
     S3_OBJECT_ACL = os.getenv("S3_OBJECT_ACL")
     S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
+    S3_PRESIGNED_TTL = int(os.getenv("S3_PRESIGNED_TTL", 300))
     ALLOWED_EXTENSIONS = tuple(
         ext.strip().lower()
         for ext in os.getenv(
