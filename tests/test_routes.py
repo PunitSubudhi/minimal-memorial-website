@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.models import Tribute
-from app.services import notifications
+from app.services import notifications, s3
 
 
 def test_index_get_renders(client) -> None:
@@ -36,6 +36,65 @@ def test_index_post_creates_tribute(client, app, monkeypatch) -> None:
         assert tribute is not None
         assert tribute.name == "Tester"
         assert captured["tribute_id"] == tribute.id
+
+
+def test_index_uses_presigned_urls(client, app, monkeypatch) -> None:
+    with app.app_context():
+        from app.services import tributes
+
+        tribute_id = tributes.create_tribute(
+            name="Signed",
+            message="Uses presign",
+            photo_entries=[
+                {
+                    "photo_s3_key": "tributes/99/sample.webp",
+                    "photo_content_type": "image/webp",
+                    "display_order": 0,
+                }
+            ],
+        ).id
+
+    monkeypatch.setattr(
+        s3,
+        "generate_presigned_get_url",
+        lambda key, **_: f"https://signed.example.com/{key}",
+    )
+
+    response = client.get("/tributes")
+
+    assert response.status_code == 200
+    assert b"https://signed.example.com/tributes/99/sample.webp" in response.data
+    assert tribute_id is not None
+
+
+def test_detail_uses_presigned_urls(client, app, monkeypatch) -> None:
+    with app.app_context():
+        from app.services import tributes
+
+        tribute = tributes.create_tribute(
+            name="Detail",
+            message="Detail presign",
+            photo_entries=[
+                {
+                    "photo_s3_key": "tributes/100/detail.webp",
+                    "photo_content_type": "image/webp",
+                    "display_order": 0,
+                }
+            ],
+        )
+
+        tribute_id = tribute.id
+
+    monkeypatch.setattr(
+        s3,
+        "generate_presigned_get_url",
+        lambda key, **_: f"https://signed.example.com/{key}",
+    )
+
+    response = client.get(f"/tributes/{tribute_id}")
+
+    assert response.status_code == 200
+    assert b"https://signed.example.com/tributes/100/detail.webp" in response.data
 
 
 def test_tribute_submission_with_contact(client, app) -> None:
