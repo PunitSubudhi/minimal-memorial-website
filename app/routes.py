@@ -14,13 +14,13 @@ from flask import (
     render_template,
     url_for,
 )
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 
 from .extensions import db
 from .forms import AdminAuthForm, TributeForm
 from .models import Tribute, TributePhoto
-from .services import notifications, storage, tributes
+from .services import notifications, s3, storage, tributes
 
 main_bp = Blueprint("main", __name__)
 
@@ -160,6 +160,15 @@ def admin_delete_tribute(tribute_id: int) -> str:
             try:
                 # Delete associated photos first (cascade should handle this, but being explicit)
                 for photo in tribute.photos:
+                    if photo.photo_s3_key:
+                        try:
+                            s3.delete_object(photo.photo_s3_key)
+                        except s3.S3Error:  # pragma: no cover - defensive logging
+                            current_app.logger.warning(
+                                "Failed to delete S3 object for photo %s",
+                                photo.id,
+                                exc_info=True,
+                            )
                     db.session.delete(photo)
                 db.session.delete(tribute)
                 db.session.commit()
@@ -201,7 +210,12 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
 
     oversample = max(limit * 3, limit)
     photos = (
-        TributePhoto.query.filter(TributePhoto.photo_b64.isnot(None))
+        TributePhoto.query.filter(
+            or_(
+                TributePhoto.photo_url.isnot(None),
+                TributePhoto.photo_b64.isnot(None),
+            )
+        )
         .order_by(func.random())
         .limit(oversample)
         .all()
@@ -211,12 +225,22 @@ def _collect_carousel_images(*, limit: int = 8) -> list[dict[str, str]]:
     seen_payloads: set[str] = set()
 
     for photo in photos:
-        payload = photo.photo_b64 or ""
-        if not payload or payload in seen_payloads:
+        identifier = (
+            (photo.photo_s3_key or "")
+            or (photo.photo_url or "")
+            or (photo.photo_b64 or "")
+        )
+        if not identifier or identifier in seen_payloads:
             continue
-        seen_payloads.add(payload)
+        seen_payloads.add(identifier)
 
-        src = f"data:{photo.photo_content_type};base64,{payload}"
+        if photo.photo_url:
+            src = photo.photo_url
+        else:
+            payload = photo.photo_b64 or ""
+            if not payload:
+                continue
+            src = f"data:{photo.photo_content_type};base64,{payload}"
         alt = photo.caption or f"Tribute photo {photo.id}"
         carousel_items.append({"src": src, "alt": alt})
 
@@ -278,6 +302,7 @@ def _serialize_tribute(model: Tribute) -> dict[str, Any]:
                 "photo_b64": photo.photo_b64,
                 "photo_content_type": photo.photo_content_type,
                 "caption": photo.caption,
+                "photo_url": photo.photo_url,
             }
             for photo in model.photos or []
         ],
