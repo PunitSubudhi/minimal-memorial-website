@@ -86,18 +86,15 @@ def prepare_photo_entries(
             "display_order": index,
         }
 
-        upload_key, upload_url = _store_in_s3(
+        upload_key, _ = _store_in_s3(
             payload_bytes,
             content_type=_WEBP_MIME,
             filename_hint=filename,
             logger=log,
         )
 
-        if upload_key and upload_url:
-            entry.update({
-                "photo_s3_key": upload_key,
-                "photo_url": upload_url,
-            })
+        if upload_key:
+            entry["photo_s3_key"] = upload_key
         else:
             entry["photo_b64"] = base64.b64encode(payload_bytes).decode("ascii")
 
