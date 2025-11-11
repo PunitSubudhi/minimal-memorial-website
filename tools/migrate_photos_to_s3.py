@@ -2,7 +2,7 @@
 """Data migration helper to move tribute photo payloads into S3.
 
 This script uploads any existing ``TributePhoto`` records that still rely on
-inline base64 storage to Amazon S3 and records the resulting key/URL metadata.
+inline base64 storage to Amazon S3 and records the resulting object keys.
 It is designed to be resumable and safe to run multiple times.
 """
 
@@ -74,6 +74,11 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Enable debug logging output",
     )
+    parser.add_argument(
+        "--nullify-photo-url",
+        action="store_true",
+        help="Unset legacy photo_url values after migration completes",
+    )
     return parser.parse_args(argv)
 
 
@@ -101,7 +106,7 @@ def generate_object_key(photo: TributePhoto) -> str:
 def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
     migrated = 0
     for photo in batch:
-        if photo.photo_s3_key and photo.photo_url:
+        if photo.photo_s3_key:
             continue
         if not photo.photo_b64:
             LOGGER.debug("Skipping photo %s: no base64 payload to migrate", photo.id)
@@ -126,7 +131,7 @@ def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
             continue
 
         try:
-            key, url = s3.upload_bytes(
+            key, _ = s3.upload_bytes(
                 payload,
                 content_type=content_type,
                 object_key=object_key,
@@ -138,7 +143,7 @@ def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
             continue
 
         photo.photo_s3_key = key
-        photo.photo_url = url
+        photo.photo_url = None
         photo.migrated_at = datetime.now(timezone.utc)
         migrated += 1
 
@@ -155,7 +160,7 @@ def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
     return migrated
 
 
-def migrate_photos(*, batch_size: int, limit: int | None, min_id: int, sleep_seconds: float, dry_run: bool) -> None:
+def migrate_photos(*, batch_size: int, limit: int | None, min_id: int, sleep_seconds: float, dry_run: bool, nullify_photo_url: bool) -> None:
     total_migrated = 0
     last_id = max(min_id, 0)
 
@@ -190,6 +195,25 @@ def migrate_photos(*, batch_size: int, limit: int | None, min_id: int, sleep_sec
 
     LOGGER.info("Migration complete; processed %s photos", total_migrated)
 
+    if dry_run or not nullify_photo_url:
+        return
+
+    updated = (
+        db.session.query(TributePhoto)
+        .filter(TributePhoto.photo_s3_key.isnot(None))
+        .filter(TributePhoto.photo_url.isnot(None))
+        .update({TributePhoto.photo_url: None}, synchronize_session=False)
+    )
+
+    if updated:
+        try:
+            db.session.commit()
+        except Exception:  # pragma: no cover - surface failure prominently
+            db.session.rollback()
+            LOGGER.exception("Failed to nullify legacy photo_url values")
+        else:
+            LOGGER.info("Cleared photo_url for %s migrated photos", updated)
+
 
 def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
@@ -207,6 +231,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             min_id=args.min_id,
             sleep_seconds=max(args.sleep, 0.0),
             dry_run=args.dry_run,
+            nullify_photo_url=args.nullify_photo_url,
         )
 
     return 0
