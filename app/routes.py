@@ -59,14 +59,14 @@ def index() -> str:
     page_size = current_app.config.get("TRIBUTES_PAGE_SIZE", 12)
 
     if form.validate_on_submit():
-        entries, had_size_error = storage.prepare_photo_entries(
+        entries, had_rejection = storage.prepare_photo_entries(
             form.photos.data or [],
             logger=current_app.logger,
             max_bytes=current_app.config.get("MAX_PHOTO_UPLOAD_BYTES"),
         )
-        if had_size_error:
+        if had_rejection:
             flash(
-                "Some photos were too large and were skipped. Smaller files work best.",
+                "Some photos could not be processed or uploaded and were skipped.",
                 "warning",
             )
         try:

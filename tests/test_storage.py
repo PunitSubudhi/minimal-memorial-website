@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import io
 
 from PIL import Image
@@ -25,7 +24,21 @@ def _make_large_bmp(size: int = 600) -> bytes:
     return buffer.getvalue()
 
 
-def test_prepare_photo_entries_converts_png_to_webp() -> None:
+def _configure_s3_stub(app, monkeypatch):
+    captured: list[dict[str, object]] = []
+
+    def _fake_upload(payload, **kwargs):
+        captured.append({"payload": payload, "kwargs": kwargs})
+        return ("tributes/1/upload.webp", "https://cdn/u")
+
+    with app.app_context():
+        app.config["S3_BUCKET_NAME"] = "test-bucket"
+        monkeypatch.setattr(storage.s3, "upload_bytes", _fake_upload)
+
+    return captured
+
+
+def test_prepare_photo_entries_converts_png_to_webp(app, monkeypatch) -> None:
     data = _make_png()
     file_storage = FileStorage(
         stream=io.BytesIO(data),
@@ -33,33 +46,38 @@ def test_prepare_photo_entries_converts_png_to_webp() -> None:
         content_type="image/png",
     )
 
-    result, had_size_error = storage.prepare_photo_entries([file_storage])
+    captures = _configure_s3_stub(app, monkeypatch)
+
+    with app.app_context():
+        result, had_rejection = storage.prepare_photo_entries([file_storage])
 
     assert len(result) == 1
-    assert not had_size_error
+    assert not had_rejection
     entry = result[0]
     assert entry["photo_content_type"] == "image/webp"
-
-    decoded = base64.b64decode(entry["photo_b64"])
-    # Valid WebP files start with "RIFF" header and contain "WEBP"
-    assert decoded[:4] == b"RIFF"
-    assert b"WEBP" in decoded[:16]
+    assert entry["photo_s3_key"].endswith("upload.webp")
+    assert captures and captures[0]["payload"][:4] == b"RIFF"
+    assert b"WEBP" in captures[0]["payload"][:16]
 
 
-def test_prepare_photo_entries_skips_invalid_images() -> None:
+def test_prepare_photo_entries_skips_invalid_images(app, monkeypatch) -> None:
     file_storage = FileStorage(
         stream=io.BytesIO(b"not an image"),
         filename="broken.png",
         content_type="image/png",
     )
 
-    result, had_size_error = storage.prepare_photo_entries([file_storage])
+    captures = _configure_s3_stub(app, monkeypatch)
+
+    with app.app_context():
+        result, had_rejection = storage.prepare_photo_entries([file_storage])
 
     assert result == []
-    assert not had_size_error
+    assert not had_rejection
+    assert captures == []
 
 
-def test_prepare_photo_entries_compresses_large_images() -> None:
+def test_prepare_photo_entries_compresses_large_images(app, monkeypatch) -> None:
     data = _make_large_bmp()
     assert len(data) > 1_048_576
 
@@ -68,10 +86,17 @@ def test_prepare_photo_entries_compresses_large_images() -> None:
         filename="noise.bmp",
         content_type="image/bmp",
     )
-    unrestricted_result, had_size_error_unrestricted = storage.prepare_photo_entries([unrestricted], max_bytes=0)
+
+    captures_unrestricted = _configure_s3_stub(app, monkeypatch)
+
+    with app.app_context():
+        unrestricted_result, had_rejection_unrestricted = storage.prepare_photo_entries(
+            [unrestricted], max_bytes=0
+        )
+
     assert unrestricted_result
-    assert not had_size_error_unrestricted
-    unrestricted_size = len(base64.b64decode(unrestricted_result[0]["photo_b64"]))
+    assert not had_rejection_unrestricted
+    unrestricted_size = len(captures_unrestricted[0]["payload"])
 
     constrained = FileStorage(
         stream=io.BytesIO(data),
@@ -79,17 +104,23 @@ def test_prepare_photo_entries_compresses_large_images() -> None:
         content_type="image/bmp",
     )
     limit = 400_000
-    constrained_result, had_size_error_constrained = storage.prepare_photo_entries([constrained], max_bytes=limit)
+
+    captures_constrained = _configure_s3_stub(app, monkeypatch)
+
+    with app.app_context():
+        constrained_result, had_rejection_constrained = storage.prepare_photo_entries(
+            [constrained], max_bytes=limit
+        )
 
     assert len(constrained_result) == 1
-    assert not had_size_error_constrained
-    constrained_size = len(base64.b64decode(constrained_result[0]["photo_b64"]))
+    assert not had_rejection_constrained
+    constrained_size = len(captures_constrained[0]["payload"])
     assert constrained_size <= limit
     assert constrained_size <= unrestricted_size
 
 
-def test_prepare_photo_entries_flags_size_error() -> None:
-    """Verify had_size_error flag is set when image cannot fit within size limit."""
+def test_prepare_photo_entries_flags_size_error(app, monkeypatch) -> None:
+    """Verify rejection flag is set when image cannot fit within size limit."""
     # Create a large image that will fail to compress below a tiny limit
     data = _make_large_bmp(size=200)
     file_storage = FileStorage(
@@ -99,12 +130,15 @@ def test_prepare_photo_entries_flags_size_error() -> None:
     )
 
     # Use a very restrictive size limit (100 bytes)
-    result, had_size_error = storage.prepare_photo_entries(
-        [file_storage], max_bytes=100
-    )
+    _configure_s3_stub(app, monkeypatch)
+
+    with app.app_context():
+        result, had_rejection = storage.prepare_photo_entries(
+            [file_storage], max_bytes=100
+        )
 
     assert result == []
-    assert had_size_error is True
+    assert had_rejection is True
 
 
 def test_prepare_photo_entries_uses_s3_when_configured(app, monkeypatch) -> None:
@@ -115,23 +149,17 @@ def test_prepare_photo_entries_uses_s3_when_configured(app, monkeypatch) -> None
         content_type="image/png",
     )
 
+    captures = _configure_s3_stub(app, monkeypatch)
+
     with app.app_context():
-        app.config["S3_BUCKET_NAME"] = "test-bucket"
+        result, had_rejection = storage.prepare_photo_entries([file_storage])
 
-        monkeypatch.setattr(
-            storage.s3,
-            "upload_bytes",
-            lambda payload, **kwargs: ("tributes/1/upload.webp", "https://cdn/u"),
-        )
-
-        result, had_size_error = storage.prepare_photo_entries([file_storage])
-
-    assert had_size_error is False
+    assert had_rejection is False
     assert result[0]["photo_s3_key"] == "tributes/1/upload.webp"
-    assert "photo_b64" not in result[0]
+    assert captures
 
 
-def test_prepare_photo_entries_falls_back_to_inline_on_s3_failure(app, monkeypatch) -> None:
+def test_prepare_photo_entries_skips_on_s3_failure(app, monkeypatch) -> None:
     data = _make_png()
     file_storage = FileStorage(
         stream=io.BytesIO(data),
@@ -146,7 +174,7 @@ def test_prepare_photo_entries_falls_back_to_inline_on_s3_failure(app, monkeypat
         app.config["S3_BUCKET_NAME"] = "test-bucket"
         monkeypatch.setattr(storage.s3, "upload_bytes", _raise)
 
-        result, had_size_error = storage.prepare_photo_entries([file_storage])
+        result, had_rejection = storage.prepare_photo_entries([file_storage])
 
-    assert had_size_error is False
-    assert "photo_b64" in result[0]
+    assert had_rejection is True
+    assert result == []

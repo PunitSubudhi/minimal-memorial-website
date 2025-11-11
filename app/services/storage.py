@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import io
 import logging
 from flask import current_app, has_app_context
@@ -33,14 +32,15 @@ def prepare_photo_entries(
     max_bytes: int | None = None,
     min_quality: int = 30,
 ) -> tuple[List[dict[str, object]], bool]:
-    """Normalize uploads, preferring S3 storage with base64 fallback.
+    """Normalize uploads and push them to S3 storage.
 
-    Returns a tuple of (prepared_entries, had_size_error) where had_size_error
-    indicates if any photos were rejected for exceeding the size cap."""
+    Returns a tuple of (prepared_entries, had_rejection) where had_rejection
+    flags that one or more photos were skipped because they could not be
+    processed or uploaded."""
     prepared: List[dict[str, object]] = []
     log = logger or LOGGER
     size_cap = _resolve_max_bytes(max_bytes)
-    had_size_error = False
+    had_rejection = False
 
     for index, storage in enumerate(files or []):
         if not isinstance(storage, FileStorage):
@@ -78,7 +78,7 @@ def prepare_photo_entries(
                     smallest_mb,
                     target_mb,
                 )
-                had_size_error = True
+                had_rejection = True
             continue
 
         entry = {
@@ -93,14 +93,19 @@ def prepare_photo_entries(
             logger=log,
         )
 
-        if upload_key:
-            entry["photo_s3_key"] = upload_key
-        else:
-            entry["photo_b64"] = base64.b64encode(payload_bytes).decode("ascii")
+        if not upload_key:
+            had_rejection = True
+            log.warning(
+                "Skipping file %s: failed to store photo in S3, entry discarded",
+                filename,
+            )
+            continue
+
+        entry["photo_s3_key"] = upload_key
 
         prepared.append(entry)
 
-    return prepared, had_size_error
+    return prepared, had_rejection
 
 
 def _store_in_s3(
@@ -122,11 +127,11 @@ def _store_in_s3(
         )
         return key, url
     except s3.S3ConfigurationError:
-        logger.debug("S3 configuration missing; falling back to inline storage")
+        logger.error("S3 configuration missing; cannot store photo uploads")
     except s3.S3Error:
-        logger.warning("Failed to upload photo to S3; storing inline instead", exc_info=True)
+        logger.warning("Failed to upload photo to S3; photo will be skipped", exc_info=True)
     except Exception:  # pragma: no cover - unexpected failure during upload
-        logger.exception("Unexpected error uploading photo to S3; storing inline")
+        logger.exception("Unexpected error uploading photo to S3; photo will be skipped")
     return None, None
 
 
