@@ -138,13 +138,23 @@ def build_public_url(key: str) -> str:
     if not key:
         raise ValueError("key must be provided")
     normalised = key.lstrip("/")
-    base_url = (
-        current_app.config.get("S3_PUBLIC_BASE_URL")
-        or os.getenv("S3_PUBLIC_BASE_URL")
-        or current_app.config.get("S3_PUBLIC_DOMAIN")
-        or os.getenv("S3_PUBLIC_DOMAIN")
-        or ""
-    ).strip()
+    # Prefer explicit config values (even empty string) over environment
+    # variables so tests and runtime can explicitly disable a public base URL
+    # by setting the config key to an empty string. Using truthiness here
+    # would cause an empty string in config to fall back to the environment,
+    # which is not desired.
+    if "S3_PUBLIC_BASE_URL" in current_app.config:
+        base_val = current_app.config.get("S3_PUBLIC_BASE_URL")
+    else:
+        base_val = os.getenv("S3_PUBLIC_BASE_URL")
+
+    if not base_val:
+        if "S3_PUBLIC_DOMAIN" in current_app.config:
+            base_val = current_app.config.get("S3_PUBLIC_DOMAIN")
+        else:
+            base_val = os.getenv("S3_PUBLIC_DOMAIN")
+
+    base_url = (base_val or "").strip()
     if base_url:
         base = base_url.rstrip("/")
         if not base.lower().startswith(("https://", "http://")):
