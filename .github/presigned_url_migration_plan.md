@@ -8,12 +8,12 @@ This plan describes how to keep the S3 bucket private while still serving tribut
 
 - Prevent direct anonymous access to the S3 bucket while keeping the memorial site functional.
 - Generate expiring `GET` URLs when views render, instead of persisting public URLs in the database.
-- Keep existing fallback behaviour so photos stored inline (base64) still render until fully migrated.
+- Keep legacy base64 rows rendering until fully migrated, but avoid creating new base64 data.
 - Minimise template churn and keep existing deletion/migration tooling useful.
 
 ## Current Snapshot (2025-11-11)
 
-- `app/services/storage.prepare_photo_entries` uploads new files to S3 (via `upload_bytes`) and persists `photo_s3_key`, `photo_url`, or base64 fallback.
+- `app/services/storage.prepare_photo_entries` uploads new files to S3 (via `upload_bytes`) and persists `photo_s3_key`; failed uploads are skipped with a warning.
 - `TributePhoto` model (`app/models.py`) stores `photo_b64`, `photo_url`, `photo_s3_key`, and `migrated_at` (nullable).
 - Templates read `photo.photo_url` with base64 fallback (`app/templates/partials/_tribute_list.html`, `app/templates/tribute_detail.html`, carousel partial).
 - Route helpers (`app/routes.py`) serialise database objects and cache results in `_CAROUSEL_CACHE` and `_TRIBUTES_CACHE`, currently storing `photo_url` strings.
@@ -37,7 +37,7 @@ This plan describes how to keep the S3 bucket private while still serving tribut
 
 ### Phase 2 – Stop Persisting Static URLs
 
-4. **Storage service**: in `prepare_photo_entries`, stop including `photo_url` in returned entries. Continue returning `photo_s3_key` so database rows retain object identifiers. Base64 fallback unchanged.
+4. **Storage service**: in `prepare_photo_entries`, stop including `photo_url` in returned entries. Continue returning `photo_s3_key` so database rows retain object identifiers. Base64 fallback already removed for new uploads.
 5. **Tribute service**: ensure `create_tribute` no longer expects `photo_url` in entries; tolerate the field but ignore it. Future data inserts should store only the key.
 6. **Migration script**: update `tools/migrate_photos_to_s3.py` to set `photo_url = None` (or simply omit). Consider adding a `--nullify-photo-url` flag to clean up existing rows after migration.
 

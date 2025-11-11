@@ -5,7 +5,7 @@ This document captures the current state of the memorial application so that fut
 ## Current Feature Set
 - Static homepage (`/`) reserved for site content (text and pictures) and a separate "Tributes" page at `/tributes` that serves the Bootstrap carousel, tribute submission form, and a gallery of recent tributes.
 - Tribute detail view (`/tributes/<id>`) showcasing the full message and associated photos.
-- Photo uploads converted to WebP, base64-stored, and rendered inline.
+- Photo uploads converted to WebP and stored in S3 (legacy base64 rows still render).
 - Hero carousel populated automatically from `static/images/` with graceful fallback messaging; carousel and submission are rendered on the Tributes page.
 - ntfy push notification dispatched after each successful tribute save.
 - Neon Postgres persistence with Flask-Migrate migrations applied (latest revision `07075a1ea27e_use_timezone_aware_timestamps`).
@@ -20,7 +20,7 @@ This document captures the current state of the memorial application so that fut
 - `app/forms.py`: `TributeForm` with name/message validation and extension whitelist checks.
 - `app/routes.py`: the tributes listing and submission flow is available at `/tributes` (function `index`); a new static home route serves `home.html` at `/`.
 - `app/services/`:
-  - `storage.py`: Pillow-based normalization to WebP and base64 encoding (HEIC supported via pillow-heif if installed).
+  - `storage.py`: Pillow-based normalization to WebP with S3 uploads (HEIC supported via pillow-heif if installed).
   - `tributes.py`: transactional creation of tributes and related photos.
   - `notifications.py`: ntfy webhook integration (non-blocking on failure).
 - `app/templates/`: `base.html` (with embedded CSS and navbar), `index.html` (Tributes), `home.html` (static landing), `tribute_detail.html`, plus partials for carousel, form, and tribute listing.
