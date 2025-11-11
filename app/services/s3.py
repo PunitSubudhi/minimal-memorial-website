@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import boto3
 from botocore.client import BaseClient
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from flask import current_app
 
@@ -34,6 +35,10 @@ class S3UploadError(S3Error):
 
 class S3DeleteError(S3Error):
     """Raised when deleting an S3 object fails."""
+
+
+class S3PresignError(S3Error):
+    """Raised when generating presigned URLs fails."""
 
 
 def upload_bytes(
@@ -153,6 +158,33 @@ def build_public_url(key: str) -> str:
     return f"https://{bucket}.s3.amazonaws.com/{normalised}"
 
 
+def generate_presigned_get_url(
+    key: str,
+    *,
+    expires_in: int | None = None,
+) -> str:
+    """Return a short-lived GET URL for the provided S3 object key."""
+    if not key:
+        raise ValueError("key must be provided for presigning")
+
+    bucket = _get_bucket_name()
+    client = _get_client()
+    normalised = key.lstrip("/")
+    ttl = _resolve_presigned_ttl(expires_in)
+
+    try:
+        return client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": normalised},
+            ExpiresIn=ttl,
+            HttpMethod="GET",
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise S3PresignError(
+            f"Failed to generate presigned URL for object {normalised!r}: {exc}"
+        ) from exc
+
+
 def _normalise_key(
     provided: str | None, filename_hint: str | None, content_type: str
 ) -> str:
@@ -197,7 +229,17 @@ def _get_client() -> BaseClient:
     if endpoint_url:
         client_kwargs["endpoint_url"] = endpoint_url
 
-    client = boto3.client("s3", **client_kwargs)
+    addressing_style = (
+        current_app.config.get("S3_ADDRESSING_STYLE")
+        or os.getenv("S3_ADDRESSING_STYLE")
+        or "virtual"
+    )
+    client_config = Config(
+        signature_version="s3v4",
+        s3={"addressing_style": addressing_style},
+    )
+
+    client = boto3.client("s3", config=client_config, **client_kwargs)
     current_app.extensions[_EXTENSION_KEY] = client
     return client
 
@@ -239,6 +281,17 @@ def _resolve_region() -> str | None:
         return str(region)
     session_region = boto3.session.Session().region_name
     return session_region
+
+
+def _resolve_presigned_ttl(value: int | None) -> int:
+    if value is not None:
+        ttl = int(value)
+    else:
+        ttl = int(current_app.config.get("S3_PRESIGNED_TTL", 300) or 0)
+
+    if ttl <= 0:
+        return 300
+    return ttl
 
 
 def _as_bool(value: Any) -> bool:
