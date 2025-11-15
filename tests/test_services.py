@@ -141,3 +141,42 @@ def test_generate_presigned_get_url_respects_override(app, monkeypatch) -> None:
 
         assert url == "https://signed.example.com/override"
         assert fake_client.expires == 45
+
+
+def test_paginate_tributes_returns_descending_batches(app) -> None:
+    with app.app_context():
+        created_ids: list[int] = []
+        for idx in range(5):
+            tribute = tributes.create_tribute(
+                name=f"Person {idx}",
+                message=f"Message {idx}",
+                photo_entries=[],
+            )
+            created_ids.append(tribute.id)
+
+        first_page = tributes.paginate_tributes(page=1, per_page=2, max_per_page=3)
+        assert len(first_page.items) == 2
+        assert first_page.has_next is True
+        assert first_page.page == 1
+        assert first_page.next_page == 2
+
+        second_page = tributes.paginate_tributes(page=2, per_page=2, max_per_page=3)
+        assert len(second_page.items) == 2
+        assert second_page.page == 2
+        assert second_page.has_next is True
+        assert second_page.has_prev is True
+
+        third_page = tributes.paginate_tributes(page=3, per_page=2, max_per_page=3)
+        assert len(third_page.items) == 1
+        assert third_page.has_next is False
+        assert third_page.prev_page == 2
+
+
+def test_paginate_tributes_clamps_invalid_input(app) -> None:
+    with app.app_context():
+        tributes.create_tribute(name="Sample", message="Body", photo_entries=[])
+
+        page = tributes.paginate_tributes(page=-1, per_page=0, max_per_page=2)
+        assert page.page == 1
+        assert page.per_page == 1
+        assert isinstance(page.items, list)

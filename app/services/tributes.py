@@ -3,12 +3,27 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional
 
 from ..extensions import db
 from ..models import Tribute, TributePhoto
+from sqlalchemy.orm import selectinload
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class TributePage:
+    """Simple pagination payload for tribute listings."""
+
+    items: list[Tribute]
+    page: int
+    per_page: int
+    has_next: bool
+    has_prev: bool
+    next_page: int | None
+    prev_page: int | None
 
 
 def create_tribute(
@@ -61,3 +76,44 @@ def create_tribute(
     db.session.commit()
     log.info("Created tribute %s with %s photos", tribute.id, len(tribute.photos))
     return tribute
+
+
+def paginate_tributes(
+    *,
+    page: int,
+    per_page: int,
+    max_per_page: int | None = None,
+) -> TributePage:
+    """Return a paginated batch of tributes ordered by newest first."""
+
+    page_number = page if page > 0 else 1
+    limit = per_page if per_page > 0 else 1
+
+    if max_per_page is not None and max_per_page > 0:
+        limit = min(limit, max_per_page)
+
+    base_query = (
+        Tribute.query.options(selectinload(Tribute.photos))
+        .order_by(Tribute.created_at.desc())
+    )
+
+    offset = (page_number - 1) * limit
+    models = base_query.offset(offset).limit(limit + 1).all()
+
+    has_next = len(models) > limit
+    if has_next:
+        items = models[:-1]
+    else:
+        items = models
+
+    has_prev = page_number > 1
+
+    return TributePage(
+        items=items,
+        page=page_number,
+        per_page=limit,
+        has_next=has_next,
+        has_prev=has_prev,
+        next_page=page_number + 1 if has_next else None,
+        prev_page=page_number - 1 if has_prev else None,
+    )

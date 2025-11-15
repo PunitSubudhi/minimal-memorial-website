@@ -373,6 +373,7 @@ def test_get_cached_tributes_returns_cached_results(app) -> None:
         from app.services import tributes
 
         app.config["TRIBUTES_CACHE_SECONDS"] = 120
+        app.config["TRIBUTES_MAX_PER_PAGE"] = 2
 
         tributes.create_tribute(
             name="Cache One",
@@ -380,17 +381,17 @@ def test_get_cached_tributes_returns_cached_results(app) -> None:
             photo_entries=[],
         )
 
-        first = _get_cached_tributes(limit=1)
+        first = _get_cached_tributes(page=1, per_page=1, max_per_page=1)
         tributes.create_tribute(
             name="Cache Two",
             message="Second",
             photo_entries=[],
         )
 
-        second = _get_cached_tributes(limit=1)
+        second = _get_cached_tributes(page=1, per_page=1, max_per_page=1)
 
-    assert len(first) == len(second) == 1
-    assert second[0].message == first[0].message
+    assert len(first["items"]) == len(second["items"]) == 1
+    assert second["items"][0]["message"] == first["items"][0]["message"]
 
 
 def test_resolve_photo_src_handles_presign_failures(app, monkeypatch) -> None:
@@ -420,6 +421,82 @@ def test_resolve_photo_src_uses_base64_payload() -> None:
     }
     resolved = _resolve_photo_src(payload)
     assert resolved == "data:image/webp;base64,Zm9v"
+
+
+def test_index_paginates_tributes(client, app) -> None:
+    app.config["TRIBUTES_PER_PAGE"] = 2
+    app.config["TRIBUTES_MAX_PER_PAGE"] = 3
+
+    with app.app_context():
+        from app.services import tributes
+
+        for idx in range(3):
+            tributes.create_tribute(
+                name=f"Person {idx}",
+                message=f"Message {idx}",
+                photo_entries=[],
+            )
+
+    response = client.get("/tributes")
+
+    assert response.status_code == 200
+    assert b"Person 2" in response.data
+    assert b"Person 1" in response.data
+    assert b"Person 0" not in response.data
+
+
+def test_index_second_page_query_returns_older_batch(client, app) -> None:
+    app.config["TRIBUTES_PER_PAGE"] = 1
+    app.config["TRIBUTES_MAX_PER_PAGE"] = 2
+
+    with app.app_context():
+        from app.services import tributes
+
+        tributes.create_tribute(name="Newest", message="Newest", photo_entries=[])
+        tributes.create_tribute(name="Older", message="Older", photo_entries=[])
+
+    response = client.get("/tributes?page=2")
+
+    assert response.status_code == 200
+    assert b"Older" in response.data
+    assert b"Newest" not in response.data
+
+
+def test_tributes_data_endpoint_returns_paginated_payload(client, app) -> None:
+    app.config["TRIBUTES_PER_PAGE"] = 1
+    app.config["TRIBUTES_MAX_PER_PAGE"] = 2
+
+    with app.app_context():
+        from app.services import tributes
+
+        alpha = tributes.create_tribute(name="Alpha", message="First", photo_entries=[])
+        tributes.create_tribute(name="Beta", message="Second", photo_entries=[])
+
+    response = client.get("/tributes/data?page=2&per_page=1")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["meta"]["page"] == 2
+    assert payload["meta"]["per_page"] == 1
+    assert payload["meta"]["has_next"] is False
+    assert len(payload["tributes"]) == 1
+    assert payload["tributes"][0]["name"] == "Alpha"
+    assert payload["tributes"][0]["detail_url"].endswith(f"/tributes/{alpha.id}") is True
+
+
+def test_tributes_data_clamps_page_size(client, app) -> None:
+    app.config["TRIBUTES_PER_PAGE"] = 2
+    app.config["TRIBUTES_MAX_PER_PAGE"] = 3
+
+    with app.app_context():
+        from app.services import tributes
+
+        tributes.create_tribute(name="Gamma", message="First", photo_entries=[])
+
+    response = client.get("/tributes/data?per_page=99")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["meta"]["per_page"] == 3
 
 
 def test_slideshow_data_endpoint_returns_ordered_payload(

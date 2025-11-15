@@ -9,6 +9,32 @@ from typing import Any, Type
 _BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _coerce_positive_int(
+    raw_value: str | None,
+    *,
+    fallback: int,
+    minimum: int = 1,
+    maximum: int | None = None,
+) -> int:
+    """Best-effort conversion of an environment value into a bounded integer."""
+
+    if raw_value is None:
+        return fallback
+
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        return fallback
+
+    if parsed < minimum:
+        return minimum
+
+    if maximum is not None and parsed > maximum:
+        return maximum
+
+    return parsed
+
+
 def _resolve_database_uri(
     env_name: str = "DATABASE_URL", *, default: str | None = None
 ) -> str:
@@ -50,7 +76,17 @@ class BaseConfig:
     WTF_CSRF_ENABLED = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    TRIBUTES_PAGE_SIZE = int(os.getenv("TRIBUTES_PAGE_SIZE", 12))
+    _default_page_size = _coerce_positive_int(
+        os.getenv("TRIBUTES_PER_PAGE") or os.getenv("TRIBUTES_PAGE_SIZE"),
+        fallback=12,
+    )
+    TRIBUTES_PER_PAGE = _default_page_size
+    TRIBUTES_PAGE_SIZE = _default_page_size  # Backwards compatibility for older code
+    TRIBUTES_MAX_PER_PAGE = _coerce_positive_int(
+        os.getenv("TRIBUTES_MAX_PER_PAGE"),
+        fallback=max(_default_page_size * 3, _default_page_size),
+        minimum=_default_page_size,
+    )
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
     AWS_REGION = os.getenv("AWS_REGION")

@@ -6,7 +6,7 @@ from time import monotonic
 from types import SimpleNamespace
 from typing import Any, Mapping
 
-from datetime import UTC
+from datetime import UTC, datetime
 
 from flask import (
     Blueprint,
@@ -32,7 +32,30 @@ main_bp = Blueprint("main", __name__)
 
 
 _CAROUSEL_CACHE: dict[int, tuple[float, list[dict[str, Any]]]] = {}
-_TRIBUTES_CACHE: dict[int, tuple[float, list[dict[str, Any]]]] = {}
+_TRIBUTES_CACHE: dict[tuple[int, int], tuple[float, dict[str, Any]]] = {}
+def _parse_positive_int(
+    raw_value: str | None,
+    *,
+    default: int,
+    maximum: int | None = None,
+) -> int:
+    """Parse a positive integer from user input with sane fallbacks."""
+
+    if raw_value is None:
+        return default
+
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        return default
+
+    if parsed <= 0:
+        return default
+
+    if maximum is not None and parsed > maximum:
+        return maximum
+
+    return parsed
 
 
 def _resolve_cache_ttl(config_key: str, default: int) -> int:
@@ -62,7 +85,11 @@ def _resolve_cache_ttl(config_key: str, default: int) -> int:
 @main_bp.route("/tributes", methods=["GET", "POST"])
 def index() -> str:
     form = TributeForm()
-    page_size = current_app.config.get("TRIBUTES_PAGE_SIZE", 12)
+    config = current_app.config
+    default_per_page = int(config.get("TRIBUTES_PER_PAGE", config.get("TRIBUTES_PAGE_SIZE", 12)))
+    max_per_page = int(config.get("TRIBUTES_MAX_PER_PAGE", default_per_page))
+    requested_page = _parse_positive_int(request.args.get("page"), default=1)
+    per_page = default_per_page
 
     if form.validate_on_submit():
         entries, had_rejection = storage.prepare_photo_entries(
@@ -101,13 +128,153 @@ def index() -> str:
             flash("Thank you for sharing your tribute.", "success")
             return redirect(url_for("main.index"))
 
+    payload = _get_cached_tributes(
+        page=requested_page,
+        per_page=per_page,
+        max_per_page=max_per_page,
+    )
+    tributes_payload = payload["items"]
+    pagination_meta = payload["meta"]
+
+    tributes_namespace = [_namespace_tribute(item) for item in tributes_payload]
+
+    pagination = {
+        **pagination_meta,
+        "next_page_url": (
+            url_for("main.index", page=pagination_meta["next_page"])
+            if pagination_meta.get("next_page")
+            else None
+        ),
+        "prev_page_url": (
+            url_for("main.index", page=pagination_meta["prev_page"])
+            if pagination_meta.get("prev_page")
+            else None
+        ),
+    }
+
     carousel_images = _collect_carousel_images(limit=8)
     return render_template(
         "index.html",
         form=form,
-        tributes=_get_cached_tributes(limit=page_size),
+        tributes=tributes_namespace,
         carousel_images=carousel_images,
+        pagination=pagination,
+        tributes_endpoint=url_for("main.tributes_data"),
     )
+
+
+@main_bp.route("/tributes/data", methods=["GET"])
+def tributes_data():
+    config = current_app.config
+    default_per_page = int(config.get("TRIBUTES_PER_PAGE", config.get("TRIBUTES_PAGE_SIZE", 12)))
+    max_per_page = int(config.get("TRIBUTES_MAX_PER_PAGE", default_per_page))
+
+    page = _parse_positive_int(request.args.get("page"), default=1)
+    per_page = _parse_positive_int(
+        request.args.get("per_page"),
+        default=default_per_page,
+        maximum=max_per_page,
+    )
+
+    payload = _get_cached_tributes(
+        page=page,
+        per_page=per_page,
+        max_per_page=max_per_page,
+    )
+
+    tributes_namespace = [_namespace_tribute(item) for item in payload["items"]]
+    tributes_payload: list[dict[str, Any]] = []
+    latest_created: datetime | None = None
+
+    for tribute in tributes_namespace:
+        tribute_dict, created_dt = _tribute_namespace_to_dict(tribute)
+        tributes_payload.append(tribute_dict)
+        if created_dt is None:
+            continue
+        if latest_created is None or created_dt > latest_created:
+            latest_created = created_dt
+
+    pagination_meta = dict(payload["meta"])
+    pagination_meta["count"] = len(tributes_payload)
+    pagination_meta["per_page"] = payload["meta"].get("per_page", per_page)
+    pagination_meta["next_page_url"] = (
+        url_for(
+            "main.tributes_data",
+            page=pagination_meta["next_page"],
+            per_page=pagination_meta["per_page"],
+        )
+        if pagination_meta.get("next_page")
+        else None
+    )
+    pagination_meta["prev_page_url"] = (
+        url_for(
+            "main.tributes_data",
+            page=pagination_meta["prev_page"],
+            per_page=pagination_meta["per_page"],
+        )
+        if pagination_meta.get("prev_page")
+        else None
+    )
+    pagination_meta["fallback_next_url"] = (
+        url_for("main.index", page=pagination_meta["next_page"])
+        if pagination_meta.get("next_page")
+        else None
+    )
+    pagination_meta["fallback_prev_url"] = (
+        url_for("main.index", page=pagination_meta["prev_page"])
+        if pagination_meta.get("prev_page")
+        else None
+    )
+
+    etag: str | None = None
+    last_modified_header: str | None = None
+
+    if tributes_payload:
+        identifier = "-".join(str(item["id"]) for item in tributes_payload)
+        etag = f'W/"tribute-page-{pagination_meta["page"]}-{pagination_meta["per_page"]}-{identifier}"'
+
+    if latest_created is not None:
+        last_modified_header = http_date(latest_created)
+
+    if etag:
+        if_none_match = request.headers.get("If-None-Match")
+        if if_none_match:
+            tags = {candidate.strip() for candidate in if_none_match.split(",")}
+            if "*" in tags or etag in tags:
+                response = make_response("", 304)
+                response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+                response.headers["ETag"] = etag
+                if last_modified_header:
+                    response.headers["Last-Modified"] = last_modified_header
+                return response
+
+    if last_modified_header:
+        if_modified_since_raw = request.headers.get("If-Modified-Since")
+        if if_modified_since_raw:
+            since_dt = parse_date(if_modified_since_raw)
+            if since_dt is not None:
+                if since_dt.tzinfo is None:
+                    since_dt = since_dt.replace(tzinfo=UTC)
+                if latest_created is not None:
+                    latest_ts = latest_created.timestamp()
+                    since_ts = since_dt.timestamp()
+                    if since_ts >= latest_ts:
+                        response = make_response("", 304)
+                        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+                        if etag:
+                            response.headers["ETag"] = etag
+                        response.headers["Last-Modified"] = last_modified_header
+                        return response
+
+    payload_body = {"tributes": tributes_payload, "meta": pagination_meta}
+
+    response = make_response(jsonify(payload_body))
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    if etag:
+        response.headers["ETag"] = etag
+    if last_modified_header:
+        response.headers["Last-Modified"] = last_modified_header
+    return response
 
 
 @main_bp.route("/home", methods=["GET"])
@@ -386,33 +553,50 @@ def _invalidate_carousel_cache() -> None:
     _CAROUSEL_CACHE.clear()
 
 
-def _get_cached_tributes(*, limit: int) -> list[SimpleNamespace]:
-    if limit <= 0:
-        return []
-
+def _get_cached_tributes(
+    *, page: int, per_page: int, max_per_page: int | None = None
+) -> dict[str, Any]:
     cache_ttl = _resolve_cache_ttl("TRIBUTES_CACHE_SECONDS", 300)
     now = monotonic()
-    cache_key = limit
 
-    if cache_ttl and cache_ttl > 0:
+    sanitized_page = page if page > 0 else 1
+    sanitized_per_page = per_page if per_page > 0 else 1
+
+    if max_per_page is not None and max_per_page > 0:
+        sanitized_per_page = min(sanitized_per_page, max_per_page)
+
+    cache_key = (sanitized_page, sanitized_per_page)
+
+    if cache_ttl and cache_ttl > 0 and sanitized_page == 1:
         cached = _TRIBUTES_CACHE.get(cache_key)
         if cached:
-            cached_at, cached_items = cached
+            cached_at, cached_payload = cached
             if now - cached_at < cache_ttl:
-                return [_namespace_tribute(item) for item in cached_items]
+                return cached_payload
 
-    tributes_q = (
-        Tribute.query.options(selectinload(Tribute.photos))
-        .order_by(Tribute.created_at.desc())
-        .limit(limit)
+    result = tributes.paginate_tributes(
+        page=sanitized_page,
+        per_page=sanitized_per_page,
+        max_per_page=max_per_page,
     )
-    tributes_serialized = [_serialize_tribute(model) for model in tributes_q]
+    tributes_serialized = [_serialize_tribute(model) for model in result.items]
 
-    if cache_ttl and cache_ttl > 0:
-        # store serialized payload only so SQLAlchemy objects are not cached directly
-        _TRIBUTES_CACHE[cache_key] = (now, tributes_serialized)
+    payload = {
+        "items": tributes_serialized,
+        "meta": {
+            "page": result.page,
+            "per_page": result.per_page,
+            "has_next": result.has_next,
+            "has_prev": result.has_prev,
+            "next_page": result.next_page,
+            "prev_page": result.prev_page,
+        },
+    }
 
-    return [_namespace_tribute(item) for item in tributes_serialized]
+    if cache_ttl and cache_ttl > 0 and result.page == 1:
+        _TRIBUTES_CACHE[(result.page, result.per_page)] = (now, payload)
+
+    return payload
 
 
 def _invalidate_tributes_cache() -> None:
@@ -463,6 +647,52 @@ def _namespace_tribute(payload: dict[str, Any]) -> SimpleNamespace:
         photos=photos,
         extra_fields=payload.get("extra_fields") or {},
     )
+
+
+def _tribute_namespace_to_dict(
+    tribute: SimpleNamespace,
+) -> tuple[dict[str, Any], datetime | None]:
+    created_at_value = getattr(tribute, "created_at", None)
+    created_dt: datetime | None = None
+    created_serialized: str | None = None
+
+    if isinstance(created_at_value, datetime):
+        if created_at_value.tzinfo is None:
+            created_dt = created_at_value.replace(tzinfo=UTC)
+        else:
+            created_dt = created_at_value.astimezone(UTC)
+        created_serialized = created_dt.isoformat()
+    elif created_at_value is not None:
+        created_serialized = str(created_at_value)
+
+    photos_payload: list[dict[str, Any]] = []
+    for photo in getattr(tribute, "photos", []):
+        photos_payload.append(
+            {
+                "id": getattr(photo, "id", None),
+                "caption": getattr(photo, "caption", None),
+                "photo_url": getattr(photo, "photo_url", None),
+                "photo_b64": getattr(photo, "photo_b64", None),
+                "photo_content_type": getattr(photo, "photo_content_type", None),
+                "photo_s3_key": getattr(photo, "photo_s3_key", None),
+            }
+        )
+
+    tribute_id = getattr(tribute, "id", None)
+    payload = {
+        "id": tribute_id,
+        "name": getattr(tribute, "name", None),
+        "message": getattr(tribute, "message", None),
+        "created_at": created_serialized,
+        "detail_url": (
+            url_for("main.tribute_detail", tribute_id=tribute_id)
+            if tribute_id is not None
+            else None
+        ),
+        "photos": photos_payload,
+    }
+
+    return payload, created_dt
 
 
 def _serialize_slideshow_tribute(model: Tribute) -> dict[str, Any]:
