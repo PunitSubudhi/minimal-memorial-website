@@ -6,16 +6,22 @@ from time import monotonic
 from types import SimpleNamespace
 from typing import Any, Mapping
 
+from datetime import UTC
+
 from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
+    make_response,
     redirect,
     render_template,
+    request,
     url_for,
 )
 from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
+from werkzeug.http import http_date, parse_date
 
 from .extensions import db
 from .forms import AdminAuthForm, TributeForm
@@ -139,6 +145,94 @@ def invitation() -> str:
         },
     ]
     return render_template("invitation.html", contacts=contacts)
+
+
+@main_bp.route("/slideshow", methods=["GET"])
+def slideshow() -> str:
+    max_message_length_raw = current_app.config.get("SLIDESHOW_MAX_MESSAGE_LENGTH", 0)
+    try:
+        max_message_length = int(max_message_length_raw)
+    except (TypeError, ValueError):
+        max_message_length = 0
+    if max_message_length < 0:
+        max_message_length = 0
+
+    return render_template(
+        "slideshow.html",
+        poll_seconds=current_app.config.get("SLIDESHOW_POLL_SECONDS", 60),
+        dwell_ms=current_app.config.get("SLIDESHOW_DWELL_MILLISECONDS", 8000),
+        transition_ms=current_app.config.get("SLIDESHOW_TRANSITION_MILLISECONDS", 800),
+        submission_url=url_for("main.index", _external=True),
+        max_message_length=max_message_length,
+    )
+
+
+@main_bp.route("/slideshow/data", methods=["GET"])
+def slideshow_data():
+    tributes_q = (
+        Tribute.query.options(selectinload(Tribute.photos))
+        .order_by(Tribute.created_at.desc())
+        .all()
+    )
+
+    tributes_payload = [_serialize_slideshow_tribute(model) for model in tributes_q]
+    latest = tributes_q[0].created_at if tributes_q else None
+    etag: str | None = None
+    last_modified_header: str | None = None
+
+    if latest is not None:
+        if latest.tzinfo is None:
+            latest_utc = latest.replace(tzinfo=UTC)
+        else:
+            latest_utc = latest.astimezone(UTC)
+        last_modified_header = http_date(latest_utc)
+        etag = f'W/"tributes-{int(latest_utc.timestamp())}-{len(tributes_payload)}"'
+
+        if_none_match = request.headers.get("If-None-Match")
+        if if_none_match:
+            tag_candidates = {
+                candidate.strip() for candidate in if_none_match.split(",")
+            }
+            if "*" in tag_candidates or etag in tag_candidates:
+                response = make_response("", 304)
+                response.headers["ETag"] = etag
+                response.headers["Last-Modified"] = last_modified_header
+                response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+                return response
+
+        if_modified_since_raw = request.headers.get("If-Modified-Since")
+        if if_modified_since_raw:
+            since_dt = parse_date(if_modified_since_raw)
+            if since_dt is not None:
+                if since_dt.tzinfo is None:
+                    since_dt = since_dt.replace(tzinfo=UTC)
+                latest_ts = latest_utc.timestamp()
+                since_ts = since_dt.timestamp()
+                if since_ts >= latest_ts:
+                    response = make_response("", 304)
+                    response.headers["ETag"] = etag
+                    response.headers["Last-Modified"] = last_modified_header
+                    response.headers["Cache-Control"] = (
+                        "public, max-age=0, must-revalidate"
+                    )
+                    return response
+
+    payload = {
+        "tributes": tributes_payload,
+        "meta": {
+            "count": len(tributes_payload),
+            "generated_at": http_date(),
+            "poll_seconds": current_app.config.get("SLIDESHOW_POLL_SECONDS", 60),
+        },
+    }
+
+    response = make_response(jsonify(payload))
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    if etag:
+        response.headers["ETag"] = etag
+    if last_modified_header:
+        response.headers["Last-Modified"] = last_modified_header
+    return response
 
 
 @main_bp.route("/tributes/<int:tribute_id>")
@@ -369,6 +463,36 @@ def _namespace_tribute(payload: dict[str, Any]) -> SimpleNamespace:
         photos=photos,
         extra_fields=payload.get("extra_fields") or {},
     )
+
+
+def _serialize_slideshow_tribute(model: Tribute) -> dict[str, Any]:
+    photos: list[dict[str, Any]] = []
+    for photo in model.photos or []:
+        src = _resolve_photo_src(photo)
+        if not src:
+            continue
+        photos.append(
+            {
+                "id": photo.id,
+                "url": src,
+                "caption": photo.caption,
+                "content_type": photo.photo_content_type,
+            }
+        )
+
+    created_at = model.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    else:
+        created_at = created_at.astimezone(UTC)
+    return {
+        "id": model.id,
+        "name": model.name,
+        "message": model.message,
+        "created_at": created_at.isoformat(),
+        "photos": photos,
+        "text_only": len(photos) == 0,
+    }
 
 
 def _hydrate_carousel_item(payload: Mapping[str, Any]) -> dict[str, str] | None:

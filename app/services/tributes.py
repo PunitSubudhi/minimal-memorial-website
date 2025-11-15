@@ -40,7 +40,9 @@ def create_tribute(
 
     for entry in photo_entries:
         photo_b64 = str(entry.get("photo_b64", "")) if entry.get("photo_b64") else None
-        photo_s3_key = str(entry.get("photo_s3_key")) if entry.get("photo_s3_key") else None
+        photo_s3_key = (
+            str(entry.get("photo_s3_key")) if entry.get("photo_s3_key") else None
+        )
         content_type = str(entry.get("photo_content_type", ""))
         display_order = int(entry.get("display_order", 0))
         caption = entry.get("caption")

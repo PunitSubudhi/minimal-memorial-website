@@ -67,5 +67,6 @@ This document captures the current state of the memorial application so that fut
 - Split the landing and tributes workflows: the landing page `/` is now a static Home template (`app/templates/home.html`) and the tributes listing/submission moved to `/tributes` (route `index` in `app/routes.py`).
 - Added a small site navbar in `app/templates/base.html` linking Home and Tributes.
 - Added `.github/HOME_PAGE.md` with instructions for adding content to the Home page.
+- Introduced a kiosk slideshow experience at `/slideshow` with a dedicated template, polling JSON feed, and client-side rotation controller.
 
 Keep this guide updated whenever the architecture or workflows evolve so future contributors have an accurate reference point.

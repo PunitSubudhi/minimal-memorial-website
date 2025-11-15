@@ -28,7 +28,9 @@ class RetryClient(FakePutClient):
         if self._first:
             self._first = False
             self.calls.append(kwargs)
-            raise ClientError({"Error": {"Code": "AccessControlListNotSupported"}}, "PutObject")
+            raise ClientError(
+                {"Error": {"Code": "AccessControlListNotSupported"}}, "PutObject"
+            )
         return super().put_object(**kwargs)
 
 
@@ -156,7 +158,9 @@ def test_build_public_url_uses_region_when_base_missing(app):
             }
         )
         url = s3.build_public_url("photos/example.jpg")
-        assert url == "https://region-bucket.s3.us-west-2.amazonaws.com/photos/example.jpg"
+        assert (
+            url == "https://region-bucket.s3.us-west-2.amazonaws.com/photos/example.jpg"
+        )
 
 
 def test_build_public_url_validates_key(app):

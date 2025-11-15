@@ -43,8 +43,10 @@ class BaseConfig:
     SQLALCHEMY_DATABASE_URI = _resolve_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = _build_engine_options(SQLALCHEMY_DATABASE_URI)
-    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 20 * 1024 * 1024)) # 20MB
-    MAX_PHOTO_UPLOAD_BYTES = int(os.getenv("MAX_PHOTO_UPLOAD_BYTES", 1 * 1024 * 1024)) # 1MB
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 20 * 1024 * 1024))  # 20MB
+    MAX_PHOTO_UPLOAD_BYTES = int(
+        os.getenv("MAX_PHOTO_UPLOAD_BYTES", 1 * 1024 * 1024)
+    )  # 1MB
     WTF_CSRF_ENABLED = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
@@ -68,6 +70,14 @@ class BaseConfig:
             "jpg,jpeg,png,webp,heic,heif,gif",
         ).split(",")
         if ext.strip()
+    )
+    SLIDESHOW_POLL_SECONDS = int(os.getenv("SLIDESHOW_POLL_SECONDS", 60))
+    SLIDESHOW_DWELL_MILLISECONDS = int(os.getenv("SLIDESHOW_DWELL_MILLISECONDS", 8000))
+    SLIDESHOW_TRANSITION_MILLISECONDS = int(
+        os.getenv("SLIDESHOW_TRANSITION_MILLISECONDS", 800)
+    )
+    SLIDESHOW_MAX_MESSAGE_LENGTH = int(
+        os.getenv("SLIDESHOW_MAX_MESSAGE_LENGTH", 600)
     )
 
 

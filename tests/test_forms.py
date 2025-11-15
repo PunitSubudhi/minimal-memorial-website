@@ -10,7 +10,9 @@ from app.forms import TributeForm
 
 
 def _make_file(name: str) -> FileStorage:
-    return FileStorage(stream=BytesIO(b"mock-data"), filename=name, content_type="image/png")
+    return FileStorage(
+        stream=BytesIO(b"mock-data"), filename=name, content_type="image/png"
+    )
 
 
 def test_validate_photos_allows_configured_extensions(app):

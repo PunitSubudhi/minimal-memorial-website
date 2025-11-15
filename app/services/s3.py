@@ -79,10 +79,7 @@ def upload_bytes(
         client.put_object(**put_params)
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
-        if (
-            error_code == "AccessControlListNotSupported"
-            and "ACL" in put_params
-        ):
+        if error_code == "AccessControlListNotSupported" and "ACL" in put_params:
             LOGGER.warning(
                 "Bucket %s rejects ACLs; retrying upload without ACL", bucket
             )
@@ -99,9 +96,7 @@ def upload_bytes(
                 f"Failed to upload object {resolved_key!r}: {exc}"
             ) from exc
     except BotoCoreError as exc:
-        raise S3UploadError(
-            f"Failed to upload object {resolved_key!r}: {exc}"
-        ) from exc
+        raise S3UploadError(f"Failed to upload object {resolved_key!r}: {exc}") from exc
 
     LOGGER.debug("Uploaded object to S3 bucket %s at key %s", bucket, resolved_key)
     return resolved_key, build_public_url(resolved_key)
@@ -122,13 +117,9 @@ def delete_object(key: str, *, ignore_missing: bool = True) -> None:
         if ignore_missing and error_code in {"NoSuchKey", "404"}:
             LOGGER.debug("S3 object %s already absent", normalised)
             return
-        raise S3DeleteError(
-            f"Failed to delete object {normalised!r}: {exc}"
-        ) from exc
+        raise S3DeleteError(f"Failed to delete object {normalised!r}: {exc}") from exc
     except BotoCoreError as exc:
-        raise S3DeleteError(
-            f"Failed to delete object {normalised!r}: {exc}"
-        ) from exc
+        raise S3DeleteError(f"Failed to delete object {normalised!r}: {exc}") from exc
 
     LOGGER.debug("Deleted object from S3 bucket %s at key %s", bucket, normalised)
 
