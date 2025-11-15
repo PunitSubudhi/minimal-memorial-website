@@ -53,3 +53,252 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    document.addEventListener('DOMContentLoaded', function () {
+        const tributeForm = document.querySelector('form[method="post"]');
+
+        if (tributeForm) {
+            tributeForm.addEventListener('submit', function (event) {
+                const submitBtn = tributeForm.querySelector('button[type="submit"], input[type="submit"]');
+
+                if (!submitBtn) {
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                const originalText = submitBtn.textContent || submitBtn.value;
+
+                if (submitBtn.tagName === 'BUTTON') {
+                    submitBtn.innerHTML = '\n                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>\n                        Processing...\n                    ';
+                } else {
+                    submitBtn.value = 'Processing...';
+                }
+
+                window.setTimeout(function () {
+                    submitBtn.disabled = false;
+                    if (submitBtn.tagName === 'BUTTON') {
+                        submitBtn.textContent = originalText;
+                    } else {
+                        submitBtn.value = originalText;
+                    }
+                }, 10000);
+            });
+        }
+
+        setupTributePagination();
+    });
+
+    function setupTributePagination() {
+        const container = document.querySelector('[data-tribute-list]');
+        const loadMoreLink = document.querySelector('[data-tribute-load-more]');
+
+        if (!container || !loadMoreLink) {
+            return;
+        }
+
+        const endpoint = container.dataset.endpoint;
+        if (!endpoint) {
+            return;
+        }
+
+        const perPage = parseInt(container.dataset.perPage || '1', 10);
+        let currentPage = parseInt(container.dataset.currentPage || '1', 10);
+        const statusRegion = document.querySelector('[data-tribute-status]');
+        const errorAlert = document.querySelector('[data-tribute-error]');
+        const itemsSelector = '[data-tribute-items]';
+
+        loadMoreLink.addEventListener('click', async function (event) {
+            event.preventDefault();
+
+            if (loadMoreLink.dataset.loading === 'true') {
+                return;
+            }
+
+            const nextPageAttr = loadMoreLink.dataset.nextPage;
+            let nextPage = parseInt(nextPageAttr || '', 10);
+            if (!nextPage) {
+                nextPage = currentPage + 1;
+            }
+
+            loadMoreLink.dataset.loading = 'true';
+            loadMoreLink.classList.add('disabled');
+            const originalLabel = loadMoreLink.textContent;
+            loadMoreLink.textContent = 'Loading…';
+            container.setAttribute('aria-busy', 'true');
+            if (statusRegion) {
+                statusRegion.textContent = 'Loading more tributes…';
+            }
+            if (errorAlert) {
+                errorAlert.classList.add('d-none');
+                errorAlert.textContent = '';
+            }
+
+            try {
+                const url = new URL(endpoint, window.location.origin);
+                url.searchParams.set('page', String(nextPage));
+                url.searchParams.set('per_page', String(perPage));
+
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        Accept: 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Request failed');
+                }
+
+                const payload = await response.json();
+                const tributes = Array.isArray(payload.tributes) ? payload.tributes : [];
+                const meta = payload.meta || {};
+
+                let itemsRow = container.querySelector(itemsSelector);
+                if (!itemsRow && tributes.length) {
+                    itemsRow = document.createElement('div');
+                    itemsRow.className = 'row g-4';
+                    itemsRow.setAttribute('data-tribute-items', 'true');
+                    container.innerHTML = '';
+                    container.appendChild(itemsRow);
+                }
+
+                if (!tributes.length) {
+                    if (statusRegion) {
+                        statusRegion.textContent = 'No additional tributes are available right now.';
+                    }
+                } else if (itemsRow) {
+                    tributes.forEach(function (tribute) {
+                        const card = buildTributeCard(tribute);
+                        if (card) {
+                            itemsRow.appendChild(card);
+                        }
+                    });
+
+                    if (statusRegion) {
+                        statusRegion.textContent = 'Added ' + tributes.length + ' more tribute' + (tributes.length === 1 ? '' : 's') + '.';
+                    }
+                }
+
+                currentPage = typeof meta.page === 'number' ? meta.page : nextPage;
+                container.dataset.currentPage = String(currentPage);
+
+                if (typeof meta.next_page === 'number' && meta.has_next) {
+                    loadMoreLink.classList.remove('d-none');
+                    loadMoreLink.dataset.nextPage = String(meta.next_page);
+                    if (meta.fallback_next_url) {
+                        loadMoreLink.href = meta.fallback_next_url;
+                    }
+                } else {
+                    loadMoreLink.classList.add('d-none');
+                }
+
+                if (meta.fallback_prev_url) {
+                    container.dataset.prevUrl = meta.fallback_prev_url;
+                }
+            } catch (error) {
+                if (errorAlert) {
+                    errorAlert.textContent = 'Unable to load more tributes right now. Please try again shortly.';
+                    errorAlert.classList.remove('d-none');
+                }
+                if (statusRegion) {
+                    statusRegion.textContent = 'We could not load additional tributes.';
+                }
+            } finally {
+                loadMoreLink.dataset.loading = 'false';
+                loadMoreLink.classList.remove('disabled');
+                loadMoreLink.textContent = originalLabel;
+                container.setAttribute('aria-busy', 'false');
+            }
+        });
+    }
+
+    function buildTributeCard(tribute) {
+        if (!tribute || typeof tribute !== 'object') {
+            return null;
+        }
+
+        const column = document.createElement('div');
+        column.className = 'col-12 col-md-6 col-lg-4';
+
+        const article = document.createElement('article');
+        article.className = 'card h-100 shadow-sm';
+
+        const photos = Array.isArray(tribute.photos) ? tribute.photos : [];
+        if (photos.length) {
+            const primary = photos[0];
+            let photoSrc = primary.photo_url || null;
+            if (!photoSrc && primary.photo_b64) {
+                const mime = primary.photo_content_type || 'image/webp';
+                photoSrc = 'data:' + mime + ';base64,' + primary.photo_b64;
+            }
+
+            if (photoSrc) {
+                const img = document.createElement('img');
+                img.src = photoSrc;
+                img.className = 'card-img-top img-fluid';
+                img.alt = 'Tribute photo';
+                article.appendChild(img);
+            }
+        }
+
+        const body = document.createElement('div');
+        body.className = 'card-body d-flex flex-column';
+
+        const title = document.createElement('h3');
+        title.className = 'h5 card-title';
+        title.textContent = tribute.name || 'Tribute';
+
+        const meta = document.createElement('p');
+        meta.className = 'card-text text-muted small mb-2';
+        meta.textContent = formatTributeDate(tribute.created_at);
+
+        const message = document.createElement('p');
+        message.className = 'card-text flex-grow-1';
+        message.textContent = truncateText(tribute.message || '', 180);
+
+        const link = document.createElement('a');
+        link.className = 'stretched-link';
+        link.href = tribute.detail_url || '#';
+        const hidden = document.createElement('span');
+        hidden.className = 'visually-hidden';
+        hidden.textContent = 'View tribute';
+        link.appendChild(hidden);
+
+        body.appendChild(title);
+        body.appendChild(meta);
+        body.appendChild(message);
+        body.appendChild(link);
+
+        article.appendChild(body);
+        column.appendChild(article);
+
+        return column;
+    }
+
+    function truncateText(value, limit) {
+        const text = value || '';
+        if (text.length <= limit) {
+            return text;
+        }
+        return text.slice(0, limit).trimEnd() + '…';
+    }
+
+    function formatTributeDate(value) {
+        if (!value) {
+            return '';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return '';
+        }
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'long',
+            day: '2-digit',
+            year: 'numeric'
+        }).format(date);
+    }
+})();
+</script>
+{% endblock %}
