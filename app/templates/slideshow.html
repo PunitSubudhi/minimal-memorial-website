@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tribute Slideshow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/slideshow.css') }}">
+  </head>
+  <body class="slideshow-body">
+    <main
+      id="slideshow-root"
+      class="slideshow-root"
+      data-poll-interval="{{ poll_seconds }}"
+      data-dwell="{{ dwell_ms }}"
+      data-transition="{{ transition_ms }}"
+      data-max-message-length="{{ max_message_length }}"
+    >
+      <div id="slide-container" class="slide-container" aria-live="polite" aria-atomic="true"></div>
+      <div id="empty-state" class="empty-state" role="status">
+        <p class="empty-state__headline">Tributes will appear here soon.</p>
+        <p class="empty-state__cta">Share your memories at <span>{{ submission_url }}</span></p>
+      </div>
+      <aside class="qr-overlay" aria-label="Tribute submission link">
+        <div class="qr-overlay__inner">
+          <div class="qr-overlay__media" role="presentation">
+            <img
+              src="{{ url_for('static', filename='images/qrcode.svg') }}"
+              alt="QR code linking to the tribute form"
+              class="qr-overlay__img"
+              loading="lazy"
+            >
+          </div>
+          <p class="qr-overlay__text">
+            Share your memories at
+            <span class="qr-overlay__url">{{ submission_url }}</span>
+          </p>
+        </div>
+      </aside>
+    </main>
+    <script>
+      window.SLIDESHOW_BOOTSTRAP = {
+        pollSeconds: {{ poll_seconds }},
+        dwellMilliseconds: {{ dwell_ms }},
+        transitionMilliseconds: {{ transition_ms }},
+        dataEndpoint: "{{ url_for('main.slideshow_data') }}",
+        submissionUrl: "{{ submission_url }}",
+        maxMessageLength: {{ max_message_length }}
+      };
+    </script>
+    <script src="{{ url_for('static', filename='js/slideshow.js') }}" defer></script>
+  </body>
+</html>

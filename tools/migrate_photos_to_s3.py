@@ -135,7 +135,10 @@ def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
                 payload,
                 content_type=content_type,
                 object_key=object_key,
-                metadata={"photo_id": str(photo.id), "tribute_id": str(photo.tribute_id)},
+                metadata={
+                    "photo_id": str(photo.id),
+                    "tribute_id": str(photo.tribute_id),
+                },
             )
         except s3.S3Error:
             LOGGER.exception("Failed to upload photo %s to S3", photo.id)
@@ -160,7 +163,15 @@ def migrate_batch(batch: list[TributePhoto], *, dry_run: bool) -> int:
     return migrated
 
 
-def migrate_photos(*, batch_size: int, limit: int | None, min_id: int, sleep_seconds: float, dry_run: bool, nullify_photo_url: bool) -> None:
+def migrate_photos(
+    *,
+    batch_size: int,
+    limit: int | None,
+    min_id: int,
+    sleep_seconds: float,
+    dry_run: bool,
+    nullify_photo_url: bool,
+) -> None:
     total_migrated = 0
     last_id = max(min_id, 0)
 
@@ -178,9 +189,7 @@ def migrate_photos(*, batch_size: int, limit: int | None, min_id: int, sleep_sec
         if not batch:
             break
 
-        LOGGER.info(
-            "Processing batch with photo IDs %s-%s", batch[0].id, batch[-1].id
-        )
+        LOGGER.info("Processing batch with photo IDs %s-%s", batch[0].id, batch[-1].id)
 
         migrated = migrate_batch(batch, dry_run=dry_run)
         total_migrated += migrated

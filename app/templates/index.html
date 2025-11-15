@@ -13,7 +13,43 @@
 </div>
 <div class="row g-4">
     <div class="col-12">
-        {% include "partials/_tribute_list.html" %}
+        <div
+            id="tribute-list-container"
+            data-tribute-list
+            data-endpoint="{{ tributes_endpoint }}"
+            data-current-page="{{ pagination.page }}"
+            data-per-page="{{ pagination.per_page }}"
+            data-has-next="{{ 'true' if pagination.has_next else 'false' }}"
+            aria-live="polite"
+            aria-busy="false"
+        >
+            {% include "partials/_tribute_list.html" %}
+        </div>
+        <div class="mt-4 text-center" id="tribute-pagination-controls">
+            <div class="visually-hidden" aria-live="polite" data-tribute-status></div>
+            <div class="alert alert-danger d-none" role="alert" data-tribute-error></div>
+            {% if pagination.has_next %}
+            <a
+                class="btn btn-outline-primary"
+                data-tribute-load-more
+                data-next-page="{{ pagination.next_page }}"
+                href="{{ pagination.next_page_url or url_for('main.index', page=pagination.next_page) }}"
+                aria-controls="tribute-list-container"
+            >
+                Load more tributes
+            </a>
+            {% endif %}
+            <noscript>
+                <div class="d-flex gap-2 justify-content-center mt-3">
+                    {% if pagination.has_prev %}
+                    <a class="btn btn-outline-secondary" href="{{ pagination.prev_page_url }}">Newer tributes</a>
+                    {% endif %}
+                    {% if pagination.has_next %}
+                    <a class="btn btn-outline-primary" href="{{ pagination.next_page_url }}">Older tributes</a>
+                    {% endif %}
+                </div>
+            </noscript>
+        </div>
     </div>
 </div>
 {% endblock %}

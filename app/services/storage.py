@@ -129,9 +129,13 @@ def _store_in_s3(
     except s3.S3ConfigurationError:
         logger.error("S3 configuration missing; cannot store photo uploads")
     except s3.S3Error:
-        logger.warning("Failed to upload photo to S3; photo will be skipped", exc_info=True)
+        logger.warning(
+            "Failed to upload photo to S3; photo will be skipped", exc_info=True
+        )
     except Exception:  # pragma: no cover - unexpected failure during upload
-        logger.exception("Unexpected error uploading photo to S3; photo will be skipped")
+        logger.exception(
+            "Unexpected error uploading photo to S3; photo will be skipped"
+        )
     return None, None
 
 
