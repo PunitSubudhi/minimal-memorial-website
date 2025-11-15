@@ -10,7 +10,360 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/slideshow.css') }}">
+    <style>
+:root {
+  color-scheme: dark;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body.slideshow-body {
+  margin: 0;
+  background: #050505;
+  color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.slideshow-root {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #161616 0%, #050505 65%, #000 100%);
+}
+
+.slide-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity var(--slide-transition, 800ms) ease-in-out;
+  pointer-events: none;
+  padding: clamp(1.5rem, 4vh, 3rem) clamp(1.5rem, 4vw, 3rem);
+}
+
+.slide.is-visible {
+  opacity: 1;
+}
+
+.slide__inner {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  width: min(92vw, 1700px);
+  height: min(86vh, 900px);
+  padding: clamp(1.75rem, 3vh, 3rem);
+  background: linear-gradient(135deg, rgba(10, 10, 10, 0.82) 0%, rgba(18, 18, 18, 0.68) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.75rem;
+  box-shadow: 0 35px 120px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+
+.slide__media {
+  flex: 1 1 58%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 1.5rem;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.4) 55%, rgba(0, 0, 0, 0.85) 100%);
+  overflow: hidden;
+}
+
+.slide__media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.slide__image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform: scale(1.01);
+  transition: transform 10s ease-in-out;
+}
+
+.slide.is-visible .slide__image {
+  transform: scale(1);
+}
+
+.slide__content {
+  flex: 0 0 clamp(22rem, 30vw, 32rem);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: clamp(1.25rem, 2.5vh, 2.5rem);
+  border-radius: 1.5rem;
+  background: linear-gradient(180deg, rgba(5, 5, 5, 0.92) 0%, rgba(18, 18, 18, 0.75) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  gap: clamp(1rem, 2vh, 1.75rem);
+  overflow: hidden;
+  text-align: left;
+}
+
+.slide__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.slide__name {
+  margin: 0;
+  font-size: clamp(1.55rem, 1.8vw, 2.25rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+}
+
+.slide__timestamp {
+  font-size: clamp(0.95rem, 1vw, 1.15rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.slide__message {
+  flex: 1 1 auto;
+  margin: 0;
+  width: 100%;
+  font-size: clamp(1.2rem, 1.4vw, 1.9rem);
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: rgba(245, 245, 245, 0.95);
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  line-clamp: 9;
+  -webkit-line-clamp: 9;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+.slide__message[data-truncated="true"]::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 2rem;
+  background: linear-gradient(180deg, rgba(18, 18, 18, 0) 0%, rgba(18, 18, 18, 1) 100%);
+  margin-top: -2rem;
+}
+
+.slide__caption {
+  margin: 0;
+  font-size: clamp(0.95rem, 1vw, 1.2rem);
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.02em;
+}
+
+.slide__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  font-size: clamp(0.95rem, 0.95vw, 1.15rem);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.slide--text-only .slide__inner {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(82vw, 1100px);
+  height: auto;
+  padding: clamp(2rem, 4vh, 3.5rem);
+  background: linear-gradient(160deg, rgba(10, 10, 10, 0.9) 0%, rgba(15, 15, 15, 0.7) 100%);
+  gap: clamp(1.5rem, 3vh, 2.5rem);
+}
+
+.slide--text-only .slide__content {
+  width: 100%;
+  max-width: none;
+  align-items: center;
+  text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  gap: clamp(0.75rem, 2vh, 1.5rem);
+}
+
+.slide--text-only .slide__message {
+  line-clamp: 10;
+  -webkit-line-clamp: 10;
+  font-size: clamp(1.6rem, 2.3vw, 2.7rem);
+}
+
+.slide--text-only .slide__meta {
+  align-items: center;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.slide--text-only .slide__caption {
+  display: none;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  background: #050505;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  padding: 2.5rem;
+}
+
+.empty-state.hidden {
+  display: none;
+}
+
+.empty-state__headline {
+  margin: 0;
+  font-size: clamp(1.6rem, 2vw + 1rem, 2.6rem);
+}
+
+.empty-state__cta {
+  margin: 0;
+  font-size: clamp(1rem, 1.2vw + 0.75rem, 1.4rem);
+}
+
+.empty-state__cta span {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.qr-overlay {
+  position: absolute;
+  right: clamp(1rem, 4vw, 3rem);
+  bottom: clamp(1rem, 4vw, 3rem);
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  width: clamp(220px, 20vw, 280px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(6px);
+}
+
+.qr-overlay__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.qr-overlay__media {
+  width: clamp(160px, 12vw, 200px);
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.75rem;
+}
+
+.qr-overlay__img {
+  max-width: 100%;
+  height: auto;
+}
+
+.qr-overlay__text {
+  margin: 0;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.qr-overlay__url {
+  display: block;
+  margin-top: 0.35rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+@media (max-width: 1200px), (max-height: 760px) {
+  .slide__inner {
+    flex-direction: column;
+    width: min(94vw, 1100px);
+    height: auto;
+  }
+
+  .slide__media {
+    width: 100%;
+    min-height: clamp(220px, 42vh, 480px);
+  }
+
+  .slide__content {
+    width: 100%;
+    max-width: none;
+  }
+
+  .slide__message {
+    line-clamp: 7;
+    -webkit-line-clamp: 7;
+  }
+
+  .qr-overlay {
+    position: static;
+    margin: clamp(1.5rem, 4vh, 2.5rem) auto 0;
+    width: min(260px, 80vw);
+    background: rgba(0, 0, 0, 0.68);
+  }
+}
+
+@media (max-width: 768px) {
+  .slide {
+    padding: clamp(1rem, 3vh, 1.75rem) clamp(1rem, 5vw, 1.5rem);
+  }
+
+  .slide__inner {
+    padding: clamp(1.25rem, 3vh, 2rem);
+    border-radius: 1.25rem;
+  }
+
+  .slide__content {
+    padding: clamp(1rem, 3vh, 1.75rem);
+  }
+
+  .slide__message {
+    font-size: clamp(1.1rem, 4vw, 1.45rem);
+  }
+
+  .slide__name {
+    font-size: clamp(1.4rem, 4.5vw, 1.9rem);
+  }
+}
+    </style>
   </head>
   <body class="slideshow-body">
     <main
@@ -30,7 +383,7 @@
         <div class="qr-overlay__inner">
           <div class="qr-overlay__media" role="presentation">
             <img
-              src="{{ url_for('static', filename='images/qrcode.svg') }}"
+              src="https://778bff83-75d6-44df-b16e-6f9c816261c4.s3.us-east-2.amazonaws.com/qrcode.svg"
               alt="QR code linking to the tribute form"
               class="qr-overlay__img"
               loading="lazy"
