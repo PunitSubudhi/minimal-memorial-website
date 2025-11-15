@@ -18,30 +18,30 @@ This document outlines the approach and tasks required to paginate the tributes 
 6. **Caching & ordering**: Preserve ordering by `Tribute.created_at DESC`; ensure eager loading of photos still applies and pagination respects existing filtering logic.
 
 ## Backend Tasks
-- [ ] **Config**: Add `TRIBUTES_PER_PAGE` to `app/config.py` with a sensible default (e.g., 12) and ensure test settings override if needed.
-- [ ] **Service**: Update `app/services/tributes.py` to expose a paginated query function returning items plus pagination flags.
-- [ ] **Routes**:
-  - [ ] Adjust the main `/tributes` route to request the first page from the service and pass pagination data to the template.
-  - [ ] Add a JSON route (`/tributes/data`) that accepts `page` (and optional `per_page`) query params, returning serialized tributes and pagination metadata.
-- [ ] **Serialization**: Reuse or extend the existing tribute serializer (currently used by the slideshow feed) so both HTML and JSON routes share a consistent output shape.
-- [ ] **Validation**: Sanitize incoming pagination parameters (ensure positive integers, enforce a max page size to prevent abuse).
-- [ ] **Headers**: Consider emitting cache-friendly headers (`Cache-Control`, `ETag`) for the JSON endpoint, mirroring the slideshow implementation where feasible.
+- [x] **Config**: Add `TRIBUTES_PER_PAGE` to `app/config.py` with a sensible default (e.g., 12) and ensure test settings override if needed.
+- [x] **Service**: Update `app/services/tributes.py` to expose a paginated query function returning items plus pagination flags.
+- [x] **Routes**:
+  - [x] Adjust the main `/tributes` route to request the first page from the service and pass pagination data to the template.
+  - [x] Add a JSON route (`/tributes/data`) that accepts `page` (and optional `per_page`) query params, returning serialized tributes and pagination metadata.
+- [x] **Serialization**: Reuse or extend the existing tribute serializer (currently used by the slideshow feed) so both HTML and JSON routes share a consistent output shape.
+- [x] **Validation**: Sanitize incoming pagination parameters (ensure positive integers, enforce a max page size to prevent abuse).
+- [x] **Headers**: Consider emitting cache-friendly headers (`Cache-Control`, `ETag`) for the JSON endpoint, mirroring the slideshow implementation where feasible.
 
 ## Frontend Tasks
-- [ ] **Template (`app/templates/index.html`)**:
-  - [ ] Render only the first page of tributes.
-  - [ ] Insert a container element and a "Load more" button that reflects whether more pages exist.
-  - [ ] Include pagination metadata in `data-*` attributes for the JS controller (e.g., current page, next page URL).
-- [ ] **JavaScript (`static/js/main.js` or new module)**:
-  - [ ] Implement a small controller that reads pagination metadata, handles button clicks, fetches more tributes via `fetch`, and appends rendered HTML to the tribute list.
-  - [ ] Provide loading state feedback and disable/hide the button when no further pages exist.
-  - [ ] Gracefully handle errors, surfacing a toast or inline message.
-- [ ] **Partial rendering**: Either reuse the existing `_tribute_list.html` partial via cloning or render new tributes client-side using a simple template literal. Prefer server-rendered partials to keep formatting consistent.
-- [ ] **Accessibility**: Ensure the button has appropriate ARIA attributes and the appended content is announced for screen readers (e.g., `aria-live` region).
+- [x] **Template (`app/templates/index.html`)**:
+  - [x] Render only the first page of tributes.
+  - [x] Insert a container element and a "Load more" button that reflects whether more pages exist.
+  - [x] Include pagination metadata in `data-*` attributes for the JS controller (e.g., current page, next page URL).
+- [x] **JavaScript (`static/js/main.js` or new module)**:
+  - [x] Implement a small controller that reads pagination metadata, handles button clicks, fetches more tributes via `fetch`, and appends rendered HTML to the tribute list.
+  - [x] Provide loading state feedback and disable/hide the button when no further pages exist.
+  - [x] Gracefully handle errors, surfacing a toast or inline message.
+- [x] **Partial rendering**: Either reuse the existing `_tribute_list.html` partial via cloning or render new tributes client-side using a simple template literal. Prefer server-rendered partials to keep formatting consistent.
+- [x] **Accessibility**: Ensure the button has appropriate ARIA attributes and the appended content is announced for screen readers (e.g., `aria-live` region).
 
 ## Testing Strategy
-- [ ] **Unit tests**: Extend `tests/test_services.py` to cover the new pagination function, including boundary conditions.
-- [ ] **Route tests**: Update `tests/test_routes.py` to verify the `/tributes` HTML route respects pagination defaults and that the `/tributes/data` endpoint returns correct metadata, ordering, and error handling for invalid params.
+- [x] **Unit tests**: Extend `tests/test_services.py` to cover the new pagination function, including boundary conditions.
+- [x] **Route tests**: Update `tests/test_routes.py` to verify the `/tributes` HTML route respects pagination defaults and that the `/tributes/data` endpoint returns correct metadata, ordering, and error handling for invalid params.
 - [ ] **Template tests**: If feasible, add tests ensuring the "Load more" button presence toggles based on `has_next` state.
 - [ ] **JavaScript**: Add or update frontend tests if we introduce a dedicated JS module (likely manual QA due to current stack).
 - [ ] **Manual QA**:
@@ -51,8 +51,8 @@ This document outlines the approach and tasks required to paginate the tributes 
   - Ensure mobile responsiveness and layout stability after additional tributes are appended.
 
 ## Rollout & Documentation
-- [ ] Update `.github/PLAN.md` and project README with pagination details and configuration knobs.
-- [ ] Document environment variables (`TRIBUTES_PER_PAGE`) and how to adjust them per deployment.
+- [x] Update `.github/PLAN.md` and project README with pagination details and configuration knobs.
+- [x] Document environment variables (`TRIBUTES_PER_PAGE`) and how to adjust them per deployment.
 - [ ] Consider adding analytics or logging to monitor pagination usage (future enhancement).
 - [ ] Communicate the change to stakeholders, highlighting the performance gains and how to adjust the load-more behavior if needed.
 
